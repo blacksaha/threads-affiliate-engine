@@ -2,13 +2,11 @@
   "functions": {
     "api/auth/**/*": {
       "memory": 1024,
-      "maxDuration": 60,
-      "runtime": "nodejs20.x"
+      "maxDuration": 60
     },
     "api/**/*": {
       "memory": 1024,
-      "maxDuration": 60,
-      "runtime": "nodejs20.x"
+      "maxDuration": 60
     }
   }
 }
