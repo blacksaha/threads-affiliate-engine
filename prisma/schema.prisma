@@ -1,0 +1,165 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Product {
+  id           String   @id @default(uuid())
+  userId       String   @default("default_user")
+  name         String
+  price        String
+  affiliateUrl String
+  imageUrl     String?
+  description  String?
+  category     String?
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  posts  ContentPost[]
+  angles ContentAngle[]
+}
+
+model ContentAngle {
+  id             String   @id @default(uuid())
+  productId      String
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  angleType      String
+  description    String
+  targetAudience String?
+  createdAt      DateTime @default(now())
+
+  posts ContentPost[]
+}
+
+model ContentPost {
+  id                String        @id @default(uuid())
+  userId            String        @default("default_user")
+  productId         String
+  product           Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  angleId           String?
+  angle             ContentAngle? @relation(fields: [angleId], references: [id], onDelete: SetNull)
+
+  content           String
+  hook              String?
+  body              String?
+  cta               String?
+
+  status            String        @default("GENERATING")
+  validationStatus  String?
+  qualityScore      Float?
+  similarityScore   Float?
+  generationAttempt Int           @default(1)
+
+  scheduledAt       DateTime?
+  publishedAt       DateTime?
+  timezone          String        @default("Asia/Makassar")
+  threadsPostId     String?
+  xContent          String?
+  fbContent         String?
+  fbComment         String?
+  lastError         String?
+  retryCount        Int           @default(0)
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  jobs      SchedulerJob[]
+  analytics PostAnalytics?
+}
+
+model PostAnalytics {
+  id              String      @id @default(uuid())
+  contentId       String      @unique
+  content         ContentPost @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  views           Int         @default(0)
+  likes           Int         @default(0)
+  replies         Int         @default(0)
+  reposts         Int         @default(0)
+  quotes          Int         @default(0)
+  engagementRate  Float       @default(0.0)
+  isTopPerformer  Boolean     @default(false)
+  lastSyncedAt    DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model AutomationSettings {
+  id                      String   @id @default("default_settings")
+  userId                  String   @unique @default("default_user")
+  enabled                 Boolean  @default(false)
+  autoGenerate            Boolean  @default(true)
+  autoSchedule            Boolean  @default(true)
+  autoPublish             Boolean  @default(true)
+  autoRegenerate          Boolean  @default(true)
+  maxRegenerationAttempts Int      @default(3)
+  postsPerDay             Int      @default(3)
+  minimumIntervalMinutes  Int      @default(240)
+  postingDays             String   @default("Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday")
+  postingTimes            String   @default("08:00,13:00,19:00")
+  timezone                String   @default("Asia/Makassar")
+  similarityThreshold     Float    @default(0.7)
+
+  threadsUserId      String?
+  threadsAccessToken String?
+  threadsConnected   Boolean  @default(false)
+
+  telegramBotToken   String?
+  telegramChatId     String?
+  telegramEnabled    Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SchedulerJob {
+  id            String      @id @default(uuid())
+  userId        String      @default("default_user")
+  contentId     String
+  content       ContentPost @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  scheduledAt   DateTime
+  status        String      @default("PENDING")
+  attempts      Int         @default(0)
+  lastAttemptAt DateTime?
+  publishedAt   DateTime?
+  errorMessage  String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model SystemLog {
+  id        String   @id @default(uuid())
+  userId    String   @default("default_user")
+  level     String   @default("INFO")
+  source    String
+  message   String
+  details   String?
+  createdAt DateTime @default(now())
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String?
+  email         String    @unique
+  password      String    @default("")
+  role          String    @default("USER") // "ADMIN" or "USER"
+  status        String    @default("ACTIVE") // "ACTIVE" or "INACTIVE"
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model SocialAccount {
+  id          String   @id @default(uuid())
+  userId      String   @default("default_user")
+  platform    String   // "THREADS", "X", "FACEBOOK"
+  name        String   // e.g. "Akun Threads 1", "Halaman FB Utama"
+  accountId   String   // user ID / page ID
+  accessToken String   // token
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
