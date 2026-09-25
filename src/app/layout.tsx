@@ -31,6 +31,18 @@ export default async function RootLayout({
 }>) {
   const session = await auth();
   const userId = session?.user?.id;
+  const userRole = (session?.user as any)?.role || "USER";
+
+  if (!userId) {
+    return (
+      <html lang="id" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+        <body className="min-h-full flex bg-slate-900 text-slate-100 font-sans">
+          <AuthProvider>{children}</AuthProvider>
+        </body>
+      </html>
+    );
+  }
+
   const settings = userId
     ? await prisma.automationSettings.findUnique({ where: { userId } })
     : null;
