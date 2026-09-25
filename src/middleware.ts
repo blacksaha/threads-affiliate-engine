@@ -50,7 +50,10 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - api/auth (auth API endpoint)
+     * - api/telegram/webhook (public webhook endpoint)
+     * - api/cron (cron endpoint)
      */
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/auth|api/telegram/webhook|api/cron|login).*)',
   ],
 };
