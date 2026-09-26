@@ -34,13 +34,6 @@ export async function GET(request: Request) {
     take: 5, // Process in batches
   });
 
-  if (jobsToProcess.length === 0) {
-    return NextResponse.json({
-      status: 'idle',
-      message: 'No scheduled jobs due for publishing.',
-    });
-  }
-
   const results = [];
 
   for (const job of jobsToProcess) {
@@ -173,6 +166,13 @@ export async function GET(request: Request) {
     }
   } catch (err) {
     console.error("[SCHEDULER] Error during auto-recovery:", err);
+  }
+
+  if (results.length === 0 && recoveredCount === 0) {
+    return NextResponse.json({
+      status: 'idle',
+      message: 'No scheduled jobs due and no failed pipelines to recover.',
+    });
   }
 
   return NextResponse.json({
