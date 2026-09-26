@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { publishThreadChain } from '@/lib/threads';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Allow 60s for batch processing and publishing
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

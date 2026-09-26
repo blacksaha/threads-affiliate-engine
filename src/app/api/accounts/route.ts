@@ -25,7 +25,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { platform, name, accountId, accessToken } = body;
+    const { platform, name, accountId, accessToken, refreshToken } = body;
 
     if (!platform || !accountId || !accessToken) {
       return NextResponse.json({ success: false, error: 'Platform, Account ID, dan Access Token wajib diisi.' }, { status: 400 });
@@ -38,6 +38,8 @@ export async function POST(request: Request) {
         name: name || `${platform} Account`,
         accountId,
         accessToken,
+        refreshToken: refreshToken || null,
+        tokenExpiresAt: platform === 'X' ? new Date(Date.now() + 7100 * 1000) : null,
         isActive: true,
       }
     });

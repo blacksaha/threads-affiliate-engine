@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { publishToAllPlatforms } from '@/lib/publisher';
 import { auth } from '@/lib/auth';
 
+export const maxDuration = 60; // Allow up to 60s for external API posting
+
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

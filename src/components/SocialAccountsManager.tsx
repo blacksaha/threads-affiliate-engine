@@ -17,6 +17,7 @@ export default function SocialAccountsManager() {
   const [name, setName] = useState("");
   const [accountId, setAccountId] = useState("");
   const [accessToken, setAccessToken] = useState("");
+  const [refreshToken, setRefreshToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [testResults, setTestResults] = useState<Record<string, { loading?: boolean; success?: boolean; message?: string }>>({});
 
@@ -66,13 +67,14 @@ export default function SocialAccountsManager() {
       const res = await fetch("/api/accounts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ platform, name, accountId, accessToken })
+        body: JSON.stringify({ platform, name, accountId, accessToken, refreshToken })
       });
       const json = await res.json();
       if (json.success) {
         setName("");
         setAccountId("");
         setAccessToken("");
+        setRefreshToken("");
         fetchAccounts();
       } else {
         alert(json.error || "Gagal menambah akun");
@@ -231,6 +233,20 @@ export default function SocialAccountsManager() {
             className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
           />
         </div>
+
+        {platform === "X" && (
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">OAuth 2.0 Refresh Token (Opsional)</label>
+            <input
+              type="password"
+              placeholder="Refresh token untuk X (berlaku 6 bulan)..."
+              value={refreshToken}
+              onChange={(e) => setRefreshToken(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">Jika diisi, bot akan otomatis merefresh Access Token X setiap 2 jam. Pastikan Account ID diisi dengan Client ID App Anda.</p>
+          </div>
+        )}
 
         <button
           type="submit"

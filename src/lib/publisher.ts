@@ -82,6 +82,62 @@ export async function publishToFacebook(
 }
 
 /**
+ * Refreshes an expired X (Twitter) OAuth 2.0 Access Token using its Refresh Token
+ */
+export async function refreshXAccessToken(account: {
+  id: string;
+  accountId: string;
+  refreshToken?: string | null;
+}): Promise<string | null> {
+  if (!account.refreshToken) return null;
+
+  try {
+    const clientId = process.env.TWITTER_CLIENT_ID || process.env.X_CLIENT_ID || account.accountId;
+    const clientSecret = process.env.TWITTER_CLIENT_SECRET || process.env.X_CLIENT_SECRET;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/x-www-form-urlencoded",
+    };
+
+    if (clientId && clientSecret) {
+      const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
+      headers["Authorization"] = `Basic ${basic}`;
+    }
+
+    const bodyParams = new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: account.refreshToken,
+      client_id: clientId,
+    });
+
+    const res = await fetch("https://api.twitter.com/2/oauth2/token", {
+      method: "POST",
+      headers,
+      body: bodyParams,
+    });
+
+    const data = await res.json();
+    if (data.access_token) {
+      const newExpires = new Date(Date.now() + (data.expires_in || 7200) * 1000);
+      await prisma.socialAccount.update({
+        where: { id: account.id },
+        data: {
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token || account.refreshToken,
+          tokenExpiresAt: newExpires,
+        },
+      });
+      return data.access_token;
+    } else {
+      console.error("Gagal refresh token X:", JSON.stringify(data));
+    }
+  } catch (err) {
+    console.error("Error refreshing X token:", err);
+  }
+  return null;
+}
+
+/**
  * Publishes content to X (Twitter) using Twitter API v2
  */
 export async function publishToX(
@@ -180,6 +236,18 @@ export async function publishToAllPlatforms(postId: string): Promise<MultiPlatfo
       const fbRes = await publishToFacebook(acc.accountId, acc.accessToken, fbText, post.product?.imageUrl, fbComment);
       results.facebook = fbRes;
     } else if (acc.platform === "X") {
+      let activeToken = acc.accessToken;
+
+      // Auto-refresh token jika mendekati kadaluarsa (sisa 5 menit) atau sudah expired
+      if (
+        acc.refreshToken &&
+        acc.tokenExpiresAt &&
+        new Date(acc.tokenExpiresAt).getTime() - Date.now() < 5 * 60 * 1000
+      ) {
+        const refreshed = await refreshXAccessToken(acc);
+        if (refreshed) activeToken = refreshed;
+      }
+
       // Prioritize explicit X content, fallback to generated blocks. Include Affiliate URL!
       let xText = post.xContent;
       if (!xText) {
@@ -193,7 +261,7 @@ export async function publishToAllPlatforms(postId: string): Promise<MultiPlatfo
         xText = xText.substring(0, maxLen) + "..." + linkStr;
       }
 
-      const xRes = await publishToX(acc.accessToken, xText);
+      const xRes = await publishToX(activeToken, xText);
       results.x = xRes;
     }
   }

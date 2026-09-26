@@ -153,13 +153,15 @@ model User {
 }
 
 model SocialAccount {
-  id          String   @id @default(uuid())
-  userId      String   @default("default_user")
-  platform    String   // "THREADS", "X", "FACEBOOK"
-  name        String   // e.g. "Akun Threads 1", "Halaman FB Utama"
-  accountId   String   // user ID / page ID
-  accessToken String   // token
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String    @id @default(uuid())
+  userId         String    @default("default_user")
+  platform       String    // "THREADS", "X", "FACEBOOK"
+  name           String    // e.g. "Akun Threads 1", "Halaman FB Utama"
+  accountId      String    // user ID / page ID
+  accessToken    String    // token
+  refreshToken   String?   // For OAuth 2.0 Auto Refresh (X / Twitter)
+  tokenExpiresAt DateTime? // Expiration time for accessToken
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 }
