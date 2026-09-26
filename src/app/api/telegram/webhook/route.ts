@@ -36,6 +36,9 @@ Output JSON:
   "affiliateUrl": "https://s.shopee.co.id/xxx",
   "imageUrl": ""
 }
+
+Pesan Pengguna Saat Ini:
+"{MESSAGE}"
 `;
 
 function extractJson(text: string): string {
