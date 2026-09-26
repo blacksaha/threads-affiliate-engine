@@ -51,6 +51,9 @@ export async function publishToFacebook(
     let commentId: string | undefined = undefined;
     if (commentLink) {
       try {
+        // Beri jeda 3 detik agar FB selesai memproses gambar dan post ID tersedia di server mereka
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
         const commentMsg = `Beli di mana? Link produk promo official ada di sini ya kak: 👇\n${commentLink}`;
         const commentRes = await fetch(`https://graph.facebook.com/v19.0/${createdPostId}/comments`, {
           method: "POST",
@@ -61,8 +64,11 @@ export async function publishToFacebook(
           }),
         });
         const commentData = await commentRes.json();
+        
         if (commentData.id) {
           commentId = commentData.id;
+        } else {
+          console.error("FB Comment Error Data:", JSON.stringify(commentData));
         }
       } catch (cErr) {
         console.error("Failed to post FB first comment:", cErr);
@@ -95,9 +101,14 @@ export async function publishToAllPlatforms(postId: string): Promise<MultiPlatfo
   if (settings?.threadsUserId && settings?.threadsAccessToken) {
     let chain: string[] = [];
     try {
-      chain = JSON.parse(post.content || "[]");
+      const parsed = JSON.parse(post.content || "[]");
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        chain = parsed;
+      } else {
+        chain = [post.hook || "", post.body || "", post.cta || ""].filter(Boolean);
+      }
     } catch {
-      chain = [post.hook || "", post.body || "", post.cta || ""];
+      chain = [post.hook || "", post.body || "", post.cta || ""].filter(Boolean);
     }
     const tRes = await publishThreadChain(
       settings.threadsUserId,
@@ -117,9 +128,14 @@ export async function publishToAllPlatforms(postId: string): Promise<MultiPlatfo
     if (acc.platform === "THREADS") {
       let chain: string[] = [];
       try {
-        chain = JSON.parse(post.content || "[]");
+        const parsed = JSON.parse(post.content || "[]");
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          chain = parsed;
+        } else {
+          chain = [post.hook || "", post.body || "", post.cta || ""].filter(Boolean);
+        }
       } catch {
-        chain = [post.hook || "", post.body || "", post.cta || ""];
+        chain = [post.hook || "", post.body || "", post.cta || ""].filter(Boolean);
       }
       await publishThreadChain(acc.accountId, acc.accessToken, chain, post.product?.imageUrl);
     } else if (acc.platform === "FACEBOOK") {
