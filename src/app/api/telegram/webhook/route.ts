@@ -52,6 +52,8 @@ function extractJson(text: string): string {
   return cleaned;
 }
 
+export const maxDuration = 60; // Allow 60s for Telegram webhook + AI Generation
+
 export async function POST(request: Request) {
   try {
     const { searchParams } = new URL(request.url);

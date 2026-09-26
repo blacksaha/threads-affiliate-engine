@@ -85,18 +85,21 @@ export async function callGemini(prompt: string): Promise<string> {
 
       if (response.status === 503) {
         console.warn(`[GEMINI] Model ${model} is experiencing high demand (503). Trying fallback...`);
+        lastError = "Server overloaded (503)";
         continue;
       }
 
       if (response.status === 429) {
-        console.warn(`[GEMINI] Model ${model} hit rate limit (429). Waiting 3s before fallback...`);
-        await new Promise((r) => setTimeout(r, 3000));
+        console.warn(`[GEMINI] Model ${model} hit rate limit (429). Waiting 5s before fallback...`);
+        lastError = "Rate limit exceeded (429) - Terlalu banyak request berdekatan";
+        await new Promise((r) => setTimeout(r, 5000));
         continue;
       }
 
       if (!response.ok) {
         const errorText = await response.text();
         console.warn(`[GEMINI] Model ${model} returned error ${response.status}: ${errorText}`);
+        lastError = `HTTP ${response.status} - ${errorText.substring(0, 100)}`;
         continue;
       }
 

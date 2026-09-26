@@ -141,9 +141,44 @@ export async function GET(request: Request) {
     }
   }
 
+  // 4. Auto-Regenerate FAILED Pipelines (Rate limit recovery)
+  let recoveredCount = 0;
+  try {
+    // Only attempt recovery if we have spare time and capacity
+    if (jobsToProcess.length < 5) {
+      // Find one active product that has only FAILED posts and no successful ones
+      const failedProductsToRecover = await prisma.product.findMany({
+        where: {
+          status: 'ACTIVE',
+          posts: {
+            some: { status: 'FAILED' },
+            none: { status: { in: ['PUBLISHED', 'SCHEDULED', 'READY'] } }
+          }
+        },
+        take: 1
+      });
+
+      for (const prod of failedProductsToRecover) {
+        const ownerSettings = await prisma.automationSettings.findUnique({
+          where: { userId: prod.userId },
+        });
+
+        if (ownerSettings?.enabled && ownerSettings?.autoRegenerate) {
+          console.log(`[SCHEDULER] Auto-recovering failed pipeline for product: ${prod.name}`);
+          const { runProductPipeline } = await import('@/lib/pipeline');
+          await runProductPipeline(prod.id, prod.userId);
+          recoveredCount++;
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[SCHEDULER] Error during auto-recovery:", err);
+  }
+
   return NextResponse.json({
     status: 'processed',
     processedCount: results.length,
+    recoveredCount,
     results,
   });
 }
