@@ -82,6 +82,42 @@ export async function publishToFacebook(
 }
 
 /**
+ * Publishes content to X (Twitter) using Twitter API v2
+ */
+export async function publishToX(
+  accessToken: string,
+  text: string
+): Promise<{ success: boolean; id?: string; error?: string }> {
+  try {
+    if (!accessToken) {
+      return { success: false, error: "Access token X belum diisi." };
+    }
+
+    // Twitter standard post endpoint (API v2)
+    const res = await fetch("https://api.twitter.com/2/tweets", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ text }),
+    });
+
+    const data = await res.json();
+    if (data.data?.id) {
+      return { success: true, id: data.data.id };
+    }
+
+    return {
+      success: false,
+      error: data.detail || data.title || JSON.stringify(data),
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Master Multi-Platform Dispatcher
  */
 export async function publishToAllPlatforms(postId: string): Promise<MultiPlatformResult> {
@@ -143,6 +179,22 @@ export async function publishToAllPlatforms(postId: string): Promise<MultiPlatfo
       const fbComment = post.fbComment || post.product?.affiliateUrl;
       const fbRes = await publishToFacebook(acc.accountId, acc.accessToken, fbText, post.product?.imageUrl, fbComment);
       results.facebook = fbRes;
+    } else if (acc.platform === "X") {
+      // Prioritize explicit X content, fallback to generated blocks. Include Affiliate URL!
+      let xText = post.xContent;
+      if (!xText) {
+        xText = `${post.hook}\n\n${post.cta}\n${post.product?.affiliateUrl || ""}`;
+      }
+      
+      // Strict 280 character limit handling for X free tier
+      if (xText.length > 280) {
+        const linkStr = post.product?.affiliateUrl ? `\n${post.product.affiliateUrl}` : "";
+        const maxLen = 280 - linkStr.length - 3;
+        xText = xText.substring(0, maxLen) + "..." + linkStr;
+      }
+
+      const xRes = await publishToX(acc.accessToken, xText);
+      results.x = xRes;
     }
   }
 
