@@ -1,14 +1,23 @@
 import { prisma } from './prisma';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+// Mengambil dan memisahkan multi-API Key
+const GEMINI_API_KEYS = (process.env.GEMINI_API_KEY || "").split(',').map(k => k.trim()).filter(k => k.length > 0);
+let currentKeyIndex = 0;
 
-// Fallback models in order of priority
+function getNextApiKey() {
+  if (GEMINI_API_KEYS.length === 0) return null;
+  const key = GEMINI_API_KEYS[currentKeyIndex];
+  currentKeyIndex = (currentKeyIndex + 1) % GEMINI_API_KEYS.length;
+  return key;
+}
+
+// Fallback models in order of priority (Sesuai instruksi: 3.8-flash didahulukan)
 const CANDIDATE_MODELS = [
+  "gemini-3.8-flash",
+  "gemini-3.8-flash-lite",
+  "gemini-3.7-flash",
   "gemini-3.6-flash",
   "gemini-3.5-flash",
-  "gemini-3.5-flash-lite",
-  "gemini-3.1-flash-lite",
-  "gemini-3.8-flash",
 ];
 
 const HOOK_ARCHETYPES = [
@@ -61,61 +70,66 @@ function extractJson(text: string): string {
 }
 
 export async function callGemini(prompt: string): Promise<string> {
-  if (!GEMINI_API_KEY) {
+  if (GEMINI_API_KEYS.length === 0) {
     throw new Error("GEMINI_API_KEY is not configured.");
   }
 
   let lastError: unknown = null;
 
   for (const model of CANDIDATE_MODELS) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45s timeout (perpanjangan untuk high demand)
+    // Coba sampai 3 kali pindah API Key jika kena limit 429 pada model yang sama
+    for (let keyAttempt = 0; keyAttempt < Math.min(GEMINI_API_KEYS.length, 3); keyAttempt++) {
+      const apiKey = getNextApiKey();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 40000);
 
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
-        signal: controller.signal,
-      });
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+          signal: controller.signal,
+        });
 
-      if (response.status === 503) {
-        console.warn(`[GEMINI] Model ${model} is experiencing high demand (503). Trying fallback...`);
-        lastError = "Server overloaded (503)";
-        continue;
+        if (response.status === 503) {
+          console.warn(`[GEMINI] Model ${model} is experiencing high demand (503). Trying fallback model...`);
+          lastError = "Server overloaded (503)";
+          break; // Break the key attempt loop, try next model
+        }
+
+        if (response.status === 429 || response.status === 403 || response.status === 400) {
+          console.warn(`[GEMINI] Model ${model} returned ${response.status} on key. Rotating to next API Key...`);
+          lastError = `Status ${response.status} on key - Switching Key`;
+          continue; // Langsung coba key berikutnya!
+        }
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.warn(`[GEMINI] Model ${model} returned error ${response.status}: ${errorText}`);
+          lastError = `HTTP ${response.status} - ${errorText.substring(0, 100)}`;
+          break; // Break the key attempt loop, try next model
+        }
+
+        const data = await response.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        if (rawText.trim()) {
+          clearTimeout(timeoutId);
+          return rawText.trim();
+        }
+      } catch (err: unknown) {
+        const isAbort = err instanceof Error && err.name === "AbortError";
+        console.warn(`[GEMINI] Attempt with model ${model} failed${isAbort ? " (timeout)" : ""}:`, err);
+        lastError = err;
+        // Jeda sangat singkat jika error network
+        await new Promise((r) => setTimeout(r, 1000));
+        break; // Break key loop, try next model
+      } finally {
+        clearTimeout(timeoutId);
       }
-
-      if (response.status === 429) {
-        console.warn(`[GEMINI] Model ${model} hit rate limit (429). Waiting 5s before fallback...`);
-        lastError = "Rate limit exceeded (429) - Terlalu banyak request berdekatan";
-        await new Promise((r) => setTimeout(r, 5000));
-        continue;
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.warn(`[GEMINI] Model ${model} returned error ${response.status}: ${errorText}`);
-        lastError = `HTTP ${response.status} - ${errorText.substring(0, 100)}`;
-        continue;
-      }
-
-      const data = await response.json();
-      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-      if (rawText.trim()) {
-        return rawText.trim();
-      }
-    } catch (err: unknown) {
-      // Beri jeda singkat sebelum mencoba model berikutnya agar tidak membebani server
-      const isAbort = err instanceof Error && err.name === "AbortError";
-      console.warn(`[GEMINI] Attempt with model ${model} failed${isAbort ? " (timeout 45s)" : ""}:`, err);
-      lastError = err;
-      await new Promise((r) => setTimeout(r, 1500));
-    } finally {
-      clearTimeout(timeoutId);
     }
   }
 
