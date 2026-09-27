@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import ProductCardActions from "@/components/ProductCardActions";
 
 export const dynamic = "force-dynamic";
 
@@ -101,28 +102,12 @@ export default async function ProductsPage() {
                 )}
               </div>
 
-              <div className="pt-4 border-t border-slate-900 flex items-center justify-between text-xs">
-                <span className="text-slate-400">
+              <div className="pt-4 border-t border-slate-900 flex flex-col gap-2">
+                <span className="text-xs text-slate-400">
                   Total Utas: <strong className="text-slate-200">{product.posts.length}</strong>
                 </span>
 
-                <form
-                  action={async () => {
-                    "use server";
-                    const { runProductPipeline } = await import("@/lib/pipeline");
-                    await runProductPipeline(product.id);
-                    revalidatePath("/products");
-                    revalidatePath("/queue");
-                    revalidatePath("/");
-                  }}
-                >
-                  <button
-                    type="submit"
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium rounded-lg transition cursor-pointer border border-slate-700/50"
-                  >
-                    ⚡ Auto-Generate Utas Baru
-                  </button>
-                </form>
+                <ProductCardActions productId={product.id} />
               </div>
             </div>
           ))}

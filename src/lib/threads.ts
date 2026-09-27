@@ -53,8 +53,13 @@ export async function publishThreadChain(
       }
 
       const containerId = createData.id;
-      // Wait 5 seconds for media processing
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+      
+      // Wait 5 seconds ONLY for image processing. Text posts are ready immediately.
+      if (isImagePost) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+      } else {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
 
       // Step 2: Publish Container
       const publishUrl = `https://graph.threads.net/v1.0/${userId}/threads_publish`;
@@ -73,8 +78,8 @@ export async function publishThreadChain(
       }
 
       replyToId = publishData.id;
-      // Natural interval between thread replies
-      await new Promise((resolve) => setTimeout(resolve, 4000));
+      // Interval between thread replies
+      await new Promise((resolve) => setTimeout(resolve, 1500));
     } catch (err: unknown) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
     }

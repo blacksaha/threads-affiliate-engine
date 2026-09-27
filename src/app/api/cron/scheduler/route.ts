@@ -20,7 +20,19 @@ export async function GET(request: Request) {
 
   const now = new Date();
 
-  // 1. Find pending jobs whose scheduledAt has arrived
+  // 0. Recover any jobs stuck in PROCESSING for more than 5 minutes
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  await prisma.schedulerJob.updateMany({
+    where: {
+      status: 'PROCESSING',
+      lastAttemptAt: { lt: fiveMinutesAgo },
+    },
+    data: {
+      status: 'PENDING',
+    },
+  });
+
+  // 1. Find pending jobs whose scheduledAt has arrived (process max 2 per run to stay well within serverless limits)
   const jobsToProcess = await prisma.schedulerJob.findMany({
     where: {
       status: 'PENDING',
@@ -31,7 +43,7 @@ export async function GET(request: Request) {
         include: { product: true },
       },
     },
-    take: 5, // Process in batches
+    take: 2, // Process in small batches
   });
 
   const results = [];
