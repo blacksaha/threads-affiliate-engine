@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { after } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { runProductPipeline } from '@/lib/pipeline';
 import { callGemini } from '@/lib/gemini';
@@ -110,37 +109,34 @@ export async function POST(request: Request) {
     if (text.includes("shopee.co.id") || text.includes("shp.ee")) {
       await sendTelegramMessage(token, chatId, "⏳ Sedang membedah produk dengan AI...");
 
-      // Jalankan seluruh proses AI di background setelah merespons 200 OK ke Telegram agar tidak timeout & retry
-      after(async () => {
-        try {
-          const prompt = EXTRACTOR_PROMPT.replace("{MESSAGE}", text);
-          const extractedText = await callGemini(prompt);
-          const parsed = JSON.parse(extractJson(extractedText));
+      try {
+        const prompt = EXTRACTOR_PROMPT.replace("{MESSAGE}", text);
+        const extractedText = await callGemini(prompt);
+        const parsed = JSON.parse(extractJson(extractedText));
 
-          await sendTelegramMessage(token, chatId, `📦 *Produk Terdeteksi!*\nNama: ${parsed.name}\nHarga: Rp ${parsed.price}\n\n⚙️ Memasukkan ke Pipeline Engine...`);
+        await sendTelegramMessage(token, chatId, `📦 *Produk Terdeteksi!*\nNama: ${parsed.name}\nHarga: Rp ${parsed.price}\n\n⚙️ Memasukkan ke Pipeline Engine...`);
 
-          const product = await prisma.product.create({
-            data: {
-              userId: targetUserId,
-              name: parsed.name,
-              price: String(parsed.price),
-              affiliateUrl: parsed.affiliateUrl,
-              imageUrl: parsed.imageUrl || null,
-            }
-          });
-
-          const res = await runProductPipeline(product.id, targetUserId);
-          if (res.success && res.post) {
-            const t = res.post.scheduledAt ? new Date(res.post.scheduledAt).toLocaleString("id-ID", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" }) : "-";
-            await sendTelegramMessage(token, chatId, `✅ *Sukses Dijadwalkan!*\n⏰ Jam Tayang: *${t}*\n💬 Preview:\n_${res.post.hook}_`);
-          } else {
-            await sendTelegramMessage(token, chatId, `❌ *Pipeline Gagal:* ${res.reason}`);
+        const product = await prisma.product.create({
+          data: {
+            userId: targetUserId,
+            name: parsed.name,
+            price: String(parsed.price),
+            affiliateUrl: parsed.affiliateUrl,
+            imageUrl: parsed.imageUrl || null,
           }
-        } catch (err: any) {
-          console.error('[BACKGROUND PIPELINE ERROR]', err);
-          await sendTelegramMessage(token, chatId, `❌ *Terjadi Kesalahan Server:* ${err.message}`);
+        });
+
+        const res = await runProductPipeline(product.id, targetUserId);
+        if (res.success && res.post) {
+          const t = res.post.scheduledAt ? new Date(res.post.scheduledAt).toLocaleString("id-ID", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" }) : "-";
+          await sendTelegramMessage(token, chatId, `✅ *Sukses Dijadwalkan!*\n⏰ Jam Tayang: *${t}*\n💬 Preview:\n_${res.post.hook}_`);
+        } else {
+          await sendTelegramMessage(token, chatId, `❌ *Pipeline Gagal:* ${res.reason}`);
         }
-      });
+      } catch (err: any) {
+        console.error('[WEBHOOK PIPELINE ERROR]', err);
+        await sendTelegramMessage(token, chatId, `❌ *Terjadi Kesalahan Server:* ${err.message}`);
+      }
     } else {
       await sendTelegramMessage(token, chatId, "Kirimkan link produk Shopee untuk diproses.");
     }

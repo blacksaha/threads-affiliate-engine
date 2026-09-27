@@ -11,13 +11,13 @@ function getNextApiKey() {
   return key;
 }
 
-// Fallback models in order of priority (Sesuai instruksi: 3.8-flash didahulukan)
+// Fallback models in order of priority (Hanya model valid yang aktif)
 const CANDIDATE_MODELS = [
   "gemini-3.8-flash",
-  "gemini-3.8-flash-lite",
   "gemini-3.7-flash",
   "gemini-3.6-flash",
   "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
 ];
 
 const HOOK_ARCHETYPES = [
