@@ -107,6 +107,33 @@ export async function POST(request: Request) {
     }
 
     if (text.includes("shopee.co.id") || text.includes("shp.ee")) {
+      // DEDUPLIKASI: Cek apakah link ini sudah pernah dikirim dalam 15 menit terakhir
+      // Menggunakan regex untuk mencari link shopee di dalam teks
+      const urlMatch = text.match(/https?:\/\/(?:s\.shopee\.co\.id|shp\.ee)\/[^\s]+/i);
+      if (urlMatch) {
+        const urlToMatch = urlMatch[0];
+        // Kita cari product dengan affiliateUrl yang mengandung ID pendek link tersebut,
+        // yang dibuat dalam 15 menit terakhir
+        const urlCode = urlToMatch.split('/').pop()?.split('?')[0]; // ambil kode uniknya (misal 5fp5orbQWs)
+        
+        if (urlCode) {
+          const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+          const existingRecent = await prisma.product.findFirst({
+            where: {
+              userId: targetUserId,
+              affiliateUrl: { contains: urlCode },
+              createdAt: { gte: fifteenMinsAgo }
+            }
+          });
+
+          if (existingRecent) {
+            console.log(`[WEBHOOK] Duplicate detected for ${urlCode}. Ignoring to prevent Telegram retry loops.`);
+            // Langsung respon OK agar Telegram berhenti mengulang (retry) pesan ini
+            return NextResponse.json({ ok: true, duplicate: true });
+          }
+        }
+      }
+
       await sendTelegramMessage(token, chatId, "⏳ Sedang membedah produk dengan AI...");
 
       try {
