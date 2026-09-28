@@ -146,21 +146,21 @@ export async function GET(request: Request) {
     }
   }
 
-  // 4. Auto-Regenerate FAILED Pipelines (Rate limit recovery)
+  // 4. Auto-Regenerate FAILED or ABORTED Pipelines (Rate limit / Timeout recovery)
   let recoveredCount = 0;
   try {
     // Only attempt recovery if we have spare time and capacity
     if (jobsToProcess.length < 5) {
-      // Find one active product that has only FAILED posts and no successful ones
+      // Find active products that have NO posts (aborted by timeout) OR only FAILED posts
       const failedProductsToRecover = await prisma.product.findMany({
         where: {
           status: 'ACTIVE',
-          posts: {
-            some: { status: 'FAILED' },
-            none: { status: { in: ['PUBLISHED', 'SCHEDULED', 'READY'] } }
-          }
+          OR: [
+            { posts: { none: {} } },
+            { posts: { some: { status: 'FAILED' }, none: { status: { in: ['PUBLISHED', 'SCHEDULED', 'READY'] } } } }
+          ]
         },
-        take: 1
+        take: 2 // Max 2 per cycle
       });
 
       for (const prod of failedProductsToRecover) {
@@ -169,10 +169,21 @@ export async function GET(request: Request) {
         });
 
         if (ownerSettings?.enabled && ownerSettings?.autoRegenerate) {
-          console.log(`[SCHEDULER] Auto-recovering failed pipeline for product: ${prod.name}`);
+          console.log(`[SCHEDULER] Auto-recovering pipeline for product: ${prod.name}`);
           const { runProductPipeline } = await import('@/lib/pipeline');
-          await runProductPipeline(prod.id, prod.userId);
+          const res = await runProductPipeline(prod.id, prod.userId);
           recoveredCount++;
+
+          // Beritahu pengguna via Telegram jika berhasil pulih
+          if (res.success && res.post && ownerSettings.telegramBotToken && ownerSettings.telegramChatId) {
+            const { sendTelegramMessage } = await import('@/lib/telegram');
+            const t = res.post.scheduledAt ? new Date(res.post.scheduledAt).toLocaleString("id-ID", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" }) : "-";
+            await sendTelegramMessage(
+              ownerSettings.telegramBotToken, 
+              ownerSettings.telegramChatId, 
+              `✅ *AI Selesai Membedah!*\n\nProduk: *${prod.name}*\n⏰ Jam Tayang: *${t}*\n💬 Preview:\n_${res.post.hook}_`
+            ).catch(console.error);
+          }
         }
       }
     }

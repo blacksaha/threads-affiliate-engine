@@ -2,7 +2,8 @@ import { prisma } from './prisma';
 
 // Mengambil dan memisahkan multi-API Key
 const GEMINI_API_KEYS = (process.env.GEMINI_API_KEY || "").split(',').map(k => k.trim()).filter(k => k.length > 0);
-let currentKeyIndex = 0;
+// Acak index awal agar beban terbagi merata sejak awal di serverless
+let currentKeyIndex = GEMINI_API_KEYS.length > 0 ? Math.floor(Math.random() * GEMINI_API_KEYS.length) : 0;
 
 function getNextApiKey() {
   if (GEMINI_API_KEYS.length === 0) return null;
@@ -77,8 +78,8 @@ export async function callGemini(prompt: string): Promise<string> {
   let lastError: unknown = null;
 
   for (const model of CANDIDATE_MODELS) {
-    // Coba sampai 3 kali pindah API Key jika kena limit 429 pada model yang sama
-    for (let keyAttempt = 0; keyAttempt < Math.min(GEMINI_API_KEYS.length, 3); keyAttempt++) {
+    // Coba SEMUA API Key yang tersedia (rotasi penuh) sebelum berpindah model
+    for (let keyAttempt = 0; keyAttempt < GEMINI_API_KEYS.length; keyAttempt++) {
       const apiKey = getNextApiKey();
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 40000);
@@ -188,7 +189,8 @@ export async function generateThreadContent(
   price: string,
   affiliateUrl: string,
   angleType: string,
-  angleDesc: string
+  angleDesc: string,
+  previousHooks: string[] = []
 ): Promise<ThreadPostDraft> {
   // Query top performing hooks for learning
   const topHooks = await prisma.contentPost.findMany({
@@ -199,6 +201,10 @@ export async function generateThreadContent(
 
   const learnedInsights = topHooks.length > 0 
     ? `\nSebagai acuan gaya, berikut adalah contoh hook yang sebelumnya mendapatkan interaksi tinggi:\n${topHooks.map(h => `- "${h.hook}"`).join('\n')}\nGunakan esensi pemicu rasa penasaran yang serupa tapi tetap segar!`
+    : "";
+
+  const antiRepetitionRule = previousHooks.length > 0 
+    ? `\n5. ANTI-REPETISI SANGAT PENTING: DILARANG KERAS menggunakan pola kalimat, ide cerita, atau hook yang mirip dengan daftar postingan sebelumnya ini:\n${previousHooks.map(h => `- "${h}"`).join('\n')}\nCiptakan sudut pandang yang 100% baru dan berbeda dari daftar di atas!`
     : "";
 
   const prompt = `
@@ -214,11 +220,7 @@ Instruksi Kreatif & Gaya Bahasa:
 3. ATURAN KETAT PEMBUKA (HOOK):
    - JANGAN PERNAH memulai dengan kata lebay/klise: "Sumpah", "Sumpah ya", "Sumpah deh", "Jujurly", "Gila sih", "Gak habis pikir", "Guys mau spill", "Halo semua".
    - Awali dengan observasi nyata, situasi spesifik, atau langsung masuk ke inti cerita secara dewasa dan mengalir santai.
-   - Contoh gaya pembuka yang bagus:
-     * "Salah satu hal kecil yang sering disepelein pas beberes rumah..."
-     * "Ternyata repotnya bukan di pekerjaannya, tapi di peralatannya yang kurang pas."
-     * "Setelah beberapa bulan nyoba ganti cara lama..."
-4. Jangan sampai terlihat jualan di postingan pertama dan kedua. Dilarang hashtag berlebihan.
+4. Jangan sampai terlihat jualan di postingan pertama dan kedua. Dilarang hashtag berlebihan.${antiRepetitionRule}
 
 Alur 4-Utas Wajib untuk Threads:
 - Post 1 (Hook): Curhat masalah sehari-hari secara relatable, natural, pakai bahasa gaul/netizen yang wajar, bikin orang merasa "I feel you". JANGAN sebut nama produk atau harga di sini.
@@ -229,6 +231,7 @@ Alur 4-Utas Wajib untuk Threads:
 Konten Tambahan untuk Multi-Platform:
 - X (Twitter): Buat 1 tweet ringkas yang menarik perhatian pembaca, lalu sertakan link (${affiliateUrl}) di bagian akhir atau format tweet + reply.
 - Facebook: Buat 1 postingan lengkap bergaya review personal mendalam. PENTING: JANGAN menyertakan link apapun di dalam teks utama Facebook ini agar jangkauan organik (reach) tidak dibatasi oleh algoritma Meta! Cukup beri arahan halus di akhir kalimat (misal: "Link produknya aku taruh di komentar pertama ya 👇").
+- fbComment: Komentar pertama Facebook berisi link produk promo: misal 'Beli di sini ya kak: [affiliateUrl]'
 
 Format output HANYA JSON object murni:
 {
@@ -238,7 +241,7 @@ Format output HANYA JSON object murni:
   "cta": "teks post 4",
   "xContent": "Teks postingan untuk X (Twitter) + Link",
   "fbContent": "Teks ulasan lengkap untuk Facebook Page tanpa link (arahin ke komentar)",
-  "fbComment": "Komentar pertama Facebook berisi link produk promo: misal 'Beli di sini ya kak: [affiliateUrl]'"
+  "fbComment": "Beli di sini ya kak: [affiliateUrl]"
 }
 `;
   const result = await callGemini(prompt);
@@ -338,77 +341,62 @@ Format output HANYA JSON object murni:
 
 /**
  * 3. Anti-Repetition Check (Similarity compare)
+ * Menggunakan perbandingan kata/token instan (0ms) untuk mencegah timeout Vercel
  */
 export async function checkAntiRepetition(newHook: string, previousHooks: string[]): Promise<ValidationResult> {
   if (previousHooks.length === 0) {
     return { pass: true, score: 0.0 };
   }
 
-  const prompt = `
-Bandingkan hook baru ini dengan hook-hook yang sudah pernah diposting sebelumnya.
-Apakah hook baru ini terlalu mirip atau repetitif dengan yang lama?
+  // Tokenize & check Jaccard similarity across previous hooks
+  const tokenize = (s: string) => new Set(s.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => w.length > 3));
+  const newTokens = tokenize(newHook);
 
-Hook Baru:
-"${newHook}"
-
-Hook Sebelumnya:
-${previousHooks.map((h, i) => `${i + 1}. "${h}"`).join("\n")}
-
-Format output HANYA JSON:
-{
-  "similarityScore": 0.25,
-  "pass": true,
-  "reason": "Penjelasan singkat"
-}
-`;
-  try {
-    const result = await callGemini(prompt);
-    const clean = extractJson(result);
-    const data = JSON.parse(clean);
-    return {
-      pass: data.pass ?? (data.similarityScore < 0.7),
-      score: data.similarityScore ?? 0.3,
-      reason: data.reason,
-    };
-  } catch {
-    return { pass: true, score: 0.2 };
+  let maxSim = 0;
+  for (const prev of previousHooks) {
+    const prevTokens = tokenize(prev);
+    const intersection = new Set([...newTokens].filter(x => prevTokens.has(x)));
+    const union = new Set([...newTokens, ...prevTokens]);
+    const sim = union.size === 0 ? 0 : intersection.size / union.size;
+    if (sim > maxSim) maxSim = sim;
   }
+
+  // Jika overlap kata lebih dari 65%, anggap terlalu mirip
+  const isTooSimilar = maxSim > 0.65;
+  return {
+    pass: !isTooSimilar,
+    score: parseFloat(maxSim.toFixed(2)),
+    reason: isTooSimilar ? `Kemiripan kata terlalu tinggi (${(maxSim * 100).toFixed(0)}%) dengan hook sebelumnya.` : undefined
+  };
 }
 
 /**
  * 4. Automated Quality Check
+ * Validasi kepatuhan format & gaya bahasa secara instan (0ms)
  */
 export async function qualityCheckContent(draft: ThreadPostDraft): Promise<ValidationResult> {
-  const prompt = `
-Lakukan Quality Check otomatis terhadap naskah thread ini:
-Post 1 (Hook): ${draft.hook}
-Post 2 (Story): ${draft.story}
-Post 3 (Review): ${draft.review}
-Post 4 (CTA): ${draft.cta}
-
-Kriteria Penilaian:
-1. Naturalness (tidak terlihat seperti bot / spam)
-2. Struktur alur cerita (Hook -> Cerita -> Review -> Link)
-3. Tidak ada klaim palsu berlebihan atau fake scarcity
-4. Link dan CTA hanya ada di Post 4
-
-Format output HANYA JSON:
-{
-  "qualityScore": 0.85,
-  "pass": true,
-  "feedback": "Komentar singkat"
-}
-`;
-  try {
-    const result = await callGemini(prompt);
-    const clean = extractJson(result);
-    const data = JSON.parse(clean);
-    return {
-      pass: data.pass ?? (data.qualityScore >= 0.75),
-      score: data.qualityScore ?? 0.85,
-      reason: data.feedback,
-    };
-  } catch {
-    return { pass: true, score: 0.85 };
+  // Cek apakah 4 bagian utama terisi
+  if (!draft.hook || !draft.story || !draft.review || !draft.cta) {
+    return { pass: false, score: 0.0, reason: "Salah satu bagian rantai utas kosong." };
   }
+
+  // Cek apakah ada link di CTA
+  const hasLinkInCta = draft.cta.includes("http://") || draft.cta.includes("https://");
+  if (!hasLinkInCta) {
+    return { pass: false, score: 0.5, reason: "Link produk tidak ditemukan pada Post 4 (CTA)." };
+  }
+
+  // Cek kata-kata terlarang / pembuka klise di Hook
+  const forbiddenKeywords = ["sumpah", "jujurly", "gila sih", "gak habis pikir", "guys mau spill", "halo semua", "spill racun"];
+  const lowerHook = draft.hook.toLowerCase();
+  for (const word of forbiddenKeywords) {
+    if (lowerHook.includes(word)) {
+      return { pass: false, score: 0.4, reason: `Hook mengandung kata terlarang: "${word}".` };
+    }
+  }
+
+  return {
+    pass: true,
+    score: 0.96,
+  };
 }

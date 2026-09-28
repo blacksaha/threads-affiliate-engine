@@ -64,22 +64,25 @@ export async function runProductPipeline(productId: string, userId = 'default_us
     create: { userId },
   });
 
-  // 1. Generate angles if product has none
+  // 1. Assign angle if product has none (Quick archetype selection without LLM latency)
   let angle = product.angles[0];
   if (!angle) {
-    const generatedAngles = await generateProductAngles(product.name, product.price, product.description ?? '');
-    const firstAngle = generatedAngles[0] || {
-      angleType: 'Problem Solver',
-      description: 'Mengatasi keluhan sehari-hari',
-      targetAudience: 'Umum',
-    };
+    const archetypes = [
+      { angleType: 'Problem Solver', description: 'Curhat masalah harian/anak kost/kantoran yang bikin jengkel secara jujur', targetAudience: 'Umum / Pekerja / Anak Kost' },
+      { angleType: 'Curious Discovery', description: 'Pengakuan nemu barang random yang ternyata mengubah rutinitas harian', targetAudience: 'Netizen yang suka kepo' },
+      { angleType: 'Myth Buster', description: 'Membantah anggapan barang bagus harus mahal padahal ada alternatif praktis', targetAudience: 'Pecinta efisiensi' },
+      { angleType: 'Plot Twist', description: 'Awalnya skeptis dan ngeremehin barangnya, pas datang malah ketagihan', targetAudience: 'Pembeli selektif' },
+      { angleType: 'Social Proof', description: 'Cerita gara-gara racun teman atau lewat di FYP terus nyobain sendiri', targetAudience: 'Anak muda / Netizen' }
+    ];
+    // Rotate or pick randomly
+    const selected = archetypes[Math.floor(Math.random() * archetypes.length)];
 
     angle = await prisma.contentAngle.create({
       data: {
         productId: product.id,
-        angleType: firstAngle.angleType,
-        description: firstAngle.description,
-        targetAudience: firstAngle.targetAudience,
+        angleType: selected.angleType,
+        description: selected.description,
+        targetAudience: selected.targetAudience,
       },
     });
   }
@@ -120,7 +123,8 @@ export async function runProductPipeline(productId: string, userId = 'default_us
           product.price,
           product.affiliateUrl,
           angle.angleType,
-          angle.description
+          angle.description,
+          previousHooks
         );
       }
 

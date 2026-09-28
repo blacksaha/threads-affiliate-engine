@@ -153,13 +153,10 @@ export async function POST(request: Request) {
           }
         });
 
-        const res = await runProductPipeline(product.id, targetUserId);
-        if (res.success && res.post) {
-          const t = res.post.scheduledAt ? new Date(res.post.scheduledAt).toLocaleString("id-ID", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short" }) : "-";
-          await sendTelegramMessage(token, chatId, `✅ *Sukses Dijadwalkan!*\n⏰ Jam Tayang: *${t}*\n💬 Preview:\n_${res.post.hook}_`);
-        } else {
-          await sendTelegramMessage(token, chatId, `❌ *Pipeline Gagal:* ${res.reason}`);
-        }
+        // Hapus pemanggilan runProductPipeline dari webhook agar webhook merespon sangat cepat (1 detik).
+        // Pipeline AI yang berat (Gemini, dll) akan otomatis ditangkap dan dieksekusi oleh Cron Job 10-menit.
+        await sendTelegramMessage(token, chatId, `✅ *Produk Masuk Antrean!*\nNama: ${parsed.name}\nHarga: Rp ${parsed.price}\n\nSistem akan merancang utas dan menjadwalkannya secara otomatis dalam beberapa menit ke depan.`);
+        
       } catch (err: any) {
         console.error('[WEBHOOK PIPELINE ERROR]', err);
         await sendTelegramMessage(token, chatId, `❌ *Terjadi Kesalahan Server:* ${err.message}`);
