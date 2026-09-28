@@ -209,36 +209,32 @@ export async function generateThreadContent(
 
   const prompt = `
 Bantu saya menjadi seorang konten kreator profesional di Threads yang natural, elegan, dan organik (BUKAN BOT SPAM IKLAN).
-Buatkan 4 rantai utas (thread) bersambung tentang produk ini:
+Tugasmu adalah membuat draft postingan bersambung tentang produk affiliate:
 Nama Produk: ${productName}
 Harga: ${price}
 Link: ${affiliateUrl}
 
-Instruksi Kreatif & Gaya Bahasa:
+Instruksi Kreatif & Gaya Bahasa (ARSITEKTUR 2-STEP COMPACT):
 1. PENTING: Gunakan Archetype / Sudut Pandang: ${angleType} (${angleDesc})${learnedInsights}.
 2. Tulis murni seperti POV pengguna asli di media sosial yang bercerita dengan tenang, wajar, dan mengalir alami.
 3. ATURAN KETAT PEMBUKA (HOOK):
    - JANGAN PERNAH memulai dengan kata lebay/klise: "Sumpah", "Sumpah ya", "Sumpah deh", "Jujurly", "Gila sih", "Gak habis pikir", "Guys mau spill", "Halo semua".
    - Awali dengan observasi nyata, situasi spesifik, atau langsung masuk ke inti cerita secara dewasa dan mengalir santai.
-4. Jangan sampai terlihat jualan di postingan pertama dan kedua. Dilarang hashtag berlebihan.${antiRepetitionRule}
+4. Jangan sampai terlihat jualan di postingan pertama. Dilarang hashtag berlebihan.${antiRepetitionRule}
 
-Alur 4-Utas Wajib untuk Threads:
-- Post 1 (Hook): Curhat masalah sehari-hari secara relatable, natural, pakai bahasa gaul/netizen yang wajar, bikin orang merasa "I feel you". JANGAN sebut nama produk atau harga di sini.
-- Post 2 (Story): Alur cerita bagaimana nemu solusi atau momen "aha!" pas mulai coba produknya. 
-- Post 3 (Review): Opini pribadi soal rasanya / dampaknya setelah pakai, kasih detail spesifik kenapa ini bagus.
-- Post 4 (CTA): Sebutkan harganya (${price}), taruh link belinya (${affiliateUrl}), dan tutup dengan kata-kata santai.
+Alur 2-Langkah Wajib:
+- Post 1 (Main Post / Hook): Panjang TEKS MAKSIMAL 150 KARAKTER. Tembak langsung masalah + klaim mutlak atau pura-pura minta review (Curiosity Inverted). Curhat masalah harian secara relatable. Asumsikan akan ditempel Foto/Video. JANGAN taruh link di Post 1.
+- Post 2 (First Reply / CTA): Tulis kalimat singkat natural memberikan Link Pembelian (CTA). Contoh: "Banyak yg nanya, aku spill tokonya di sini ya mumpung diskon 👇 [affiliateUrl]". Sebutkan harganya (${price}).
 
 Konten Tambahan untuk Multi-Platform:
-- X (Twitter): Buat 1 tweet ringkas yang menarik perhatian pembaca, lalu sertakan link (${affiliateUrl}) di bagian akhir atau format tweet + reply.
-- Facebook: Buat 1 postingan lengkap bergaya review personal mendalam. PENTING: JANGAN menyertakan link apapun di dalam teks utama Facebook ini agar jangkauan organik (reach) tidak dibatasi oleh algoritma Meta! Cukup beri arahan halus di akhir kalimat (misal: "Link produknya aku taruh di komentar pertama ya 👇").
+- X (Twitter): Teks yang sama dengan Threads (Post 1 dan Post 2).
+- Facebook: Buat 1 postingan lengkap bergaya review personal mendalam. PENTING: JANGAN menyertakan link apapun di dalam teks utama Facebook! Cukup beri arahan halus di akhir kalimat.
 - fbComment: Komentar pertama Facebook berisi link produk promo: misal 'Beli di sini ya kak: [affiliateUrl]'
 
 Format output HANYA JSON object murni:
 {
-  "hook": "teks post 1",
-  "story": "teks post 2",
-  "review": "teks post 3",
-  "cta": "teks post 4",
+  "hook": "teks post 1 (maksimal 150 karakter, tanpa link)",
+  "cta": "teks post 2 (reply pertama berisi link dan CTA)",
   "xContent": "Teks postingan untuk X (Twitter) + Link",
   "fbContent": "Teks ulasan lengkap untuk Facebook Page tanpa link (arahin ke komentar)",
   "fbComment": "Beli di sini ya kak: [affiliateUrl]"
@@ -250,13 +246,11 @@ Format output HANYA JSON object murni:
 
   return {
     hook: parsed.hook || `Ada satu hal yang baru kusadari soal masalah ini...`,
-    story: parsed.story || `Sampe akhirnya nemu ${productName} ini pas lagi cari solusi.`,
-    review: parsed.review || `Pas barangnya nyampe dan dicoba, lumayan ngebantu banget.`,
-    cta: parsed.cta || `Harganya cuma ${price}, cek di sini 👉 ${affiliateUrl}`,
+            cta: parsed.cta || `Harganya cuma ${price}, cek di sini 👉 ${affiliateUrl}`,
+    story: "",
+    review: "",
     chain: [
       parsed.hook || `Satu hal yang bikin sadar...`,
-      parsed.story || `Nemu solusi ini...`,
-      parsed.review || `Review jujur setelah dicoba...`,
       parsed.cta || `Cek promo di ${affiliateUrl}`,
     ],
     xContent: parsed.xContent || parsed.hook,
@@ -293,14 +287,9 @@ Instruksi Kreatif:
    - Buka langsung dengan pernyataan fakta, tips solutif, atau observasi menarik yang tenang dan berwawasan.
 4. Hanya di akhir cerita/tips, sebutkan bahwa produk rekomendasi (${productName}) adalah salah satu alat bantu yang mempermudah hal tersebut.
 
-Alur 4-Utas Threads:
-- Post 1 (Hook): Opini atau fakta menarik / keresahan nyata seputar tema "${theme}".
-- Post 2 (Story/Tips): 2-3 poin tips praktis atau pandangan mendalam yang bermanfaat.
-- Post 3 (Kaitan Produk): Cerita bagaimana produk ${productName} membantu mempraktikkan tips tersebut.
-- Post 4 (CTA): Sebutkan kisaran harga ${price} dan link Shopee (${affiliateUrl}).
-
-Konten X (Twitter):
-- Tweet pendek dan padat merangkum inti tips dari tema, lalu ditutup link produk.
+Alur 2-Langkah:
+- Post 1 (Main Post / Hook): Opini atau fakta menarik / keresahan nyata seputar tema "${theme}". Padatkan tips/edukasi dalam postingan ini. Panjang maksimal 180 karakter. Jangan sertakan link.
+- Post 2 (First Reply / CTA): Cerita singkat bagaimana produk ${productName} membantu, sebutkan harga ${price} dan link Shopee (${affiliateUrl}).
 
 Konten Facebook Page:
 - Satu tulisan panjang lengkap yang sangat bermanfaat untuk dibaca followers tentang "${theme}".
@@ -308,10 +297,8 @@ Konten Facebook Page:
 
 Format output HANYA JSON object murni:
 {
-  "hook": "teks post 1",
-  "story": "teks post 2 (tips/edukasi)",
-  "review": "teks post 3 (kaitan solusi)",
-  "cta": "teks post 4 (link)",
+  "hook": "teks post 1 (tips padat, maks 180 chars)",
+  "cta": "teks post 2 (kaitan solusi dan link affiliate)",
   "xContent": "Teks untuk X (Twitter) + Link",
   "fbContent": "Teks ulasan/artikel Facebook tanpa link",
   "fbComment": "Beli ${productName} resmi di sini ya kak: ${affiliateUrl}"
@@ -324,13 +311,11 @@ Format output HANYA JSON object murni:
 
   return {
     hook: parsed.hook || `Satu hal penting tentang ${theme} yang jarang dibahas orang:`,
-    story: parsed.story || `Banyak orang salah kaprah pas nyoba hal ini...`,
-    review: parsed.review || `Solusi simpelnya bisa pakai ${productName} ini, beneran ngebantu banget.`,
-    cta: parsed.cta || `Harganya cuma ${price}, cek promo di sini 👉 ${affiliateUrl}`,
+            cta: parsed.cta || `Harganya cuma ${price}, cek promo di sini 👉 ${affiliateUrl}`,
+    story: "",
+    review: "",
     chain: [
       parsed.hook || `Tips tentang ${theme}:`,
-      parsed.story || `Poin pentingnya...`,
-      parsed.review || `Bisa dibantu dengan ${productName}...`,
       parsed.cta || `Cek promo di ${affiliateUrl}`,
     ],
     xContent: parsed.xContent || parsed.hook,
@@ -376,14 +361,14 @@ export async function checkAntiRepetition(newHook: string, previousHooks: string
  */
 export async function qualityCheckContent(draft: ThreadPostDraft): Promise<ValidationResult> {
   // Cek apakah 4 bagian utama terisi
-  if (!draft.hook || !draft.story || !draft.review || !draft.cta) {
-    return { pass: false, score: 0.0, reason: "Salah satu bagian rantai utas kosong." };
+  if (!draft.hook || !draft.cta) {
+    return { pass: false, score: 0.0, reason: "Bagian Hook atau CTA utas kosong." };
   }
 
   // Cek apakah ada link di CTA
   const hasLinkInCta = draft.cta.includes("http://") || draft.cta.includes("https://");
   if (!hasLinkInCta) {
-    return { pass: false, score: 0.5, reason: "Link produk tidak ditemukan pada Post 4 (CTA)." };
+    return { pass: false, score: 0.5, reason: "Link produk tidak ditemukan pada CTA (Balasan)." };
   }
 
   // Cek kata-kata terlarang / pembuka klise di Hook
