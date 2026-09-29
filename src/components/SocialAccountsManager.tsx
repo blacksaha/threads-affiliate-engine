@@ -222,17 +222,40 @@ export default function SocialAccountsManager() {
           </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1">Long-Lived Access Token</label>
-          <input
-            type="password"
-            required
-            placeholder="Token resmi platform..."
-            value={accessToken}
-            onChange={(e) => setAccessToken(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
-          />
-        </div>
+        {platform !== "FACEBOOK" && (
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Long-Lived Access Token</label>
+            <input
+              type="password"
+              required
+              placeholder="Token resmi platform..."
+              value={accessToken}
+              onChange={(e) => setAccessToken(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
+            />
+          </div>
+        )}
+
+        {platform === "FACEBOOK" && (
+          <>
+            <div className="p-3 bg-blue-900/20 border border-blue-800 rounded-lg text-xs text-blue-200">
+              <strong>Untuk Facebook Page:</strong><br />
+              Ambil Page Access Token dari Graph API Explorer, lalu paste di sini. Untuk memperpanjang token otomatis, isi Facebook App ID & App Secret di Vercel Environment Variables.<br />
+              Token akan otomatis dicek setiap kali posting.
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Facebook Page Access Token</label>
+              <input
+                type="password"
+                required
+                placeholder="Paste EAAxxx Page Access Token di sini..."
+                value={accessToken}
+                onChange={(e) => setAccessToken(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
+              />
+            </div>
+          </>
+        )}
 
         {platform === "X" && (
           <div>

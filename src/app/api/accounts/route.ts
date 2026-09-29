@@ -31,13 +31,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Platform, Account ID, dan Access Token wajib diisi.' }, { status: 400 });
     }
 
+    let finalAccessToken = accessToken;
+
+    // Untuk Facebook Page Access Token, coba extend ke Long-Lived Token jika App ID & App Secret tersedia
+    if (platform === 'FACEBOOK') {
+      const appId = process.env.FACEBOOK_APP_ID;
+      const appSecret = process.env.FACEBOOK_APP_SECRET;
+      if (appId && appSecret) {
+        try {
+          const exchangeRes = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${accessToken}`);
+          const exchangeData = await exchangeRes.json();
+          if (exchangeData.access_token) {
+            finalAccessToken = exchangeData.access_token;
+          }
+        } catch (err) {
+          console.warn('[FACEBOOK] Gagal extend token saat registrasi:', err);
+        }
+      }
+    }
+
     const account = await prisma.socialAccount.create({
       data: {
         userId,
         platform,
         name: name || `${platform} Account`,
         accountId,
-        accessToken,
+        accessToken: finalAccessToken,
         refreshToken: refreshToken || null,
         tokenExpiresAt: platform === 'X' ? new Date(Date.now() + 7100 * 1000) : null,
         isActive: true,

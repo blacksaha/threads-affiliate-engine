@@ -22,6 +22,31 @@ export async function publishToFacebook(
       return { success: false, error: "Facebook Page ID atau Token belum diisi." };
     }
 
+    // Coba extend Page Access Token ke long-lived jika App ID & App Secret tersedia
+    const appId = process.env.FACEBOOK_APP_ID;
+    const appSecret = process.env.FACEBOOK_APP_SECRET;
+    let activeToken = accessToken;
+    if (appId && appSecret) {
+      try {
+        const exchangeRes = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${accessToken}`);
+        const exchangeData = await exchangeRes.json();
+        if (exchangeData.access_token) {
+          activeToken = exchangeData.access_token;
+        }
+      } catch (err) {
+        console.warn('[FACEBOOK] Gagal extend token saat posting:', err);
+      }
+    }
+
+    // Validasi token ke Graph API sebelum posting (mengembalikan error jika expired/invalid)
+    const tokenDebugRes = await fetch(`https://graph.facebook.com/v19.0/me?access_token=${activeToken}&fields=id`);
+    const tokenDebugData = await tokenDebugRes.json();
+    if (tokenDebugData.error) {
+      return { success: false, error: `Token invalid/expired: ${tokenDebugData.error.message}` };
+    }
+
+    accessToken = activeToken;
+
     let url = `https://graph.facebook.com/v19.0/${pageId}/feed`;
     const body: Record<string, string> = {
       message,
