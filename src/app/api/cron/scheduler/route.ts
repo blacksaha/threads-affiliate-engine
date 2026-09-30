@@ -59,16 +59,25 @@ export async function GET(request: Request) {
       continue;
     }
 
-    // Idempotency: Lock job to PROCESSING
+    // Idempotency: lock status + attempt count
     await prisma.schedulerJob.update({
       where: { id: job.id },
       data: { status: 'PROCESSING', lastAttemptAt: now, attempts: { increment: 1 } },
     });
 
-    await prisma.contentPost.update({
+    // Double-check guard: if already published by another concurrent run, skip
+    const freshContent = await prisma.contentPost.findUnique({
       where: { id: job.contentId },
-      data: { status: 'PUBLISHING' },
+      select: { status: true, publishedAt: true, threadsPostId: true, facebookPostId: true, xPostId: true }
     });
+    if (freshContent?.status === 'PUBLISHED') {
+      console.log(`[SCHEDULER] Job ${job.id} already published (status=PUBLISHED). Skipping.`);
+      await prisma.schedulerJob.update({
+        where: { id: job.id },
+        data: { status: 'COMPLETED', publishedAt: freshContent.publishedAt || new Date() },
+      });
+      continue;
+    }
 
     // 3. Delegate to the Multi-Platform Publisher!
     // The publisher automatically loads the correct tokens for this user.
@@ -81,21 +90,36 @@ export async function GET(request: Request) {
       publishResult = { threads: { success: false, error: e.message } };
     }
 
+    // Idempotency: mark post as PUBLISHED only if not already published
+    const alreadyPublished = await prisma.contentPost.findUnique({
+      where: { id: job.contentId },
+      select: { status: true, publishedAt: true, threadsPostId: true, facebookPostId: true, xPostId: true }
+    });
+
+    if (alreadyPublished?.status === 'PUBLISHED') {
+      console.log(`[SCHEDULER] Content ${job.contentId} already PUBLISHED. Skipping duplicate update.`);
+      results.push({ jobId: job.id, status: 'ALREADY_PUBLISHED' });
+      continue;
+    }
+
     // We consider it a success if at least threads published successfully (or if it wasn't requested but something else succeeded)
     const isSuccess = publishResult.threads?.success || publishResult.facebook?.success || publishResult.x?.success;
 
     if (isSuccess) {
+      const publishedAt = new Date();
       await prisma.schedulerJob.update({
         where: { id: job.id },
-        data: { status: 'COMPLETED', publishedAt: new Date() },
+        data: { status: 'COMPLETED', publishedAt },
       });
 
       await prisma.contentPost.update({
         where: { id: job.contentId },
         data: {
           status: 'PUBLISHED',
-          publishedAt: new Date(),
-          threadsPostId: publishResult.threads?.id || null,
+          publishedAt,
+          threadsPostId: publishResult.threads?.id || alreadyPublished?.threadsPostId || null,
+          facebookPostId: publishResult.facebook?.id || alreadyPublished?.facebookPostId || null,
+          xPostId: publishResult.x?.id || alreadyPublished?.xPostId || null,
         },
       });
 

@@ -59,6 +59,8 @@ model ContentPost {
   publishedAt       DateTime?
   timezone          String        @default("Asia/Makassar")
   threadsPostId     String?
+  facebookPostId    String?
+  xPostId           String?
   xContent          String?
   fbContent         String?
   fbComment         String?

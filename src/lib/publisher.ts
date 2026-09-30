@@ -211,29 +211,35 @@ export async function publishToAllPlatforms(postId: string): Promise<MultiPlatfo
     throw new Error("Post not found");
   }
 
+  // CRITICAL IDEMPOTENCY: Don't republish if already published on a platform
   const results: MultiPlatformResult = {};
   const settings = await prisma.automationSettings.findUnique({ where: { userId: post.userId } });
 
   // 1. Publish to Primary Threads
   if (settings?.threadsUserId && settings?.threadsAccessToken) {
-    let chain: string[] = [];
-    try {
-      const parsed = JSON.parse(post.content || "[]");
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        chain = parsed;
-      } else {
+    if (post.threadsPostId) {
+      console.log(`[PUBLISHER] Threads already published for post ${postId}. Skipping.`);
+      results.threads = { success: true, id: post.threadsPostId };
+    } else {
+      let chain: string[] = [];
+      try {
+        const parsed = JSON.parse(post.content || "[]");
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          chain = parsed;
+        } else {
+          chain = [post.hook || "", post.body || "", post.cta || ""].filter(Boolean);
+        }
+      } catch {
         chain = [post.hook || "", post.body || "", post.cta || ""].filter(Boolean);
       }
-    } catch {
-      chain = [post.hook || "", post.body || "", post.cta || ""].filter(Boolean);
+      const tRes = await publishThreadChain(
+        settings.threadsUserId,
+        settings.threadsAccessToken,
+        chain,
+        post.product?.imageUrl
+      );
+      results.threads = { success: tRes.success, id: tRes.publishedId, error: tRes.error };
     }
-    const tRes = await publishThreadChain(
-      settings.threadsUserId,
-      settings.threadsAccessToken,
-      chain,
-      post.product?.imageUrl
-    );
-    results.threads = { success: tRes.success, id: tRes.publishedId, error: tRes.error };
   }
 
   // 2. Publish to Extra Connected Accounts (Multi-Threads / Facebook / X)
@@ -243,6 +249,10 @@ export async function publishToAllPlatforms(postId: string): Promise<MultiPlatfo
 
   for (const acc of extraAccounts) {
     if (acc.platform === "THREADS") {
+      if (post.threadsPostId) {
+        console.log(`[PUBLISHER] Threads already published for post ${postId}. Skipping extra account.`);
+        continue;
+      }
       let chain: string[] = [];
       try {
         const parsed = JSON.parse(post.content || "[]");
@@ -256,11 +266,19 @@ export async function publishToAllPlatforms(postId: string): Promise<MultiPlatfo
       }
       await publishThreadChain(acc.accountId, acc.accessToken, chain, post.product?.imageUrl);
     } else if (acc.platform === "FACEBOOK") {
+      if (post.facebookPostId) {
+        console.log(`[PUBLISHER] Facebook already published for post ${postId}. Skipping.`);
+        continue;
+      }
       const fbText = post.fbContent || `${post.hook}\n\n${post.body}\n\n${post.cta}`;
       const fbComment = post.fbComment || post.product?.affiliateUrl;
       const fbRes = await publishToFacebook(acc.accountId, acc.accessToken, fbText, post.product?.imageUrl, fbComment);
       results.facebook = fbRes;
     } else if (acc.platform === "X") {
+      if (post.xPostId) {
+        console.log(`[PUBLISHER] X already published for post ${postId}. Skipping.`);
+        continue;
+      }
       let activeToken = acc.accessToken;
 
       // Auto-refresh token jika mendekati kadaluarsa (sisa 5 menit) atau sudah expired
