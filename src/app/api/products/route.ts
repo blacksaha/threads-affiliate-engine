@@ -40,13 +40,25 @@ export async function POST(request: Request) {
   }
 
   // 1. Create Product in DB with authenticated userId
+
+  // Fallback: scrape image if not provided
+  let finalImageUrl = imageUrl || null;
+  if (!finalImageUrl && affiliateUrl) {
+    const { scrapeShopeePage } = await import('@/lib/shopee');
+    const scraped = await scrapeShopeePage(affiliateUrl);
+    if (scraped.imageUrl) {
+      finalImageUrl = scraped.imageUrl;
+      console.log(`[PRODUCTS API] Image URL found: ${finalImageUrl}`);
+    }
+  }
+
   const product = await prisma.product.create({
     data: {
       userId,
       name,
       price,
       affiliateUrl,
-      imageUrl: imageUrl || null,
+      imageUrl: finalImageUrl,
     },
   });
 

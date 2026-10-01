@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { runProductPipeline } from '@/lib/pipeline';
 import { callGemini } from '@/lib/gemini';
 import { sendTelegramMessage } from '@/lib/telegram';
+import { scrapeShopeePage } from '@/lib/shopee';
 
 const EXTRACTOR_PROMPT = `
 Anda adalah AI asisten bot yang cerdas dalam mengekstrak data produk Shopee dari pesan pengguna.
@@ -143,13 +144,27 @@ export async function POST(request: Request) {
 
         await sendTelegramMessage(token, chatId, `📦 *Produk Terdeteksi!*\nNama: ${parsed.name}\nHarga: Rp ${parsed.price}\n\n⚙️ Memasukkan ke Pipeline Engine...`);
 
+        // Ambil gambar produk langsung dari halaman Shopee agar postingan FB punya foto
+        let finalImageUrl: string | null = parsed.imageUrl || null;
+        if (!finalImageUrl && parsed.affiliateUrl) {
+          try {
+            const scraped = await scrapeShopeePage(parsed.affiliateUrl);
+            if (scraped.imageUrl) {
+              finalImageUrl = scraped.imageUrl;
+              console.log(`[WEBHOOK] Image URL found: ${finalImageUrl}`);
+            }
+          } catch (e) {
+            console.warn('[WEBHOOK] Image scrape failed:', e);
+          }
+        }
+
         const product = await prisma.product.create({
           data: {
             userId: targetUserId,
             name: parsed.name,
             price: String(parsed.price),
             affiliateUrl: parsed.affiliateUrl,
-            imageUrl: parsed.imageUrl || null,
+            imageUrl: finalImageUrl,
           }
         });
 

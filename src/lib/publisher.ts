@@ -47,16 +47,23 @@ export async function publishToFacebook(
 
     accessToken = activeToken;
 
-    let url = `https://graph.facebook.com/v19.0/${pageId}/feed`;
+    // Determine posting endpoint: use /photos if an image is available so it renders as a real photo post.
+    let url: string;
     const body: Record<string, string> = {
       message,
       access_token: accessToken,
     };
 
     if (imageUrl && imageUrl.startsWith("http")) {
+      // Post as a real photo post (visible in the Photos tab and as a large image in the feed).
       url = `https://graph.facebook.com/v19.0/${pageId}/photos`;
       body.url = imageUrl;
       body.caption = message;
+      // published=1 ensures it goes to the Page feed rather than a draft album.
+      body.published = "1";
+    } else {
+      // Plain text post when no image is available.
+      url = `https://graph.facebook.com/v19.0/${pageId}/feed`;
     }
 
     const res = await fetch(url, {
@@ -274,6 +281,13 @@ export async function publishToAllPlatforms(postId: string): Promise<MultiPlatfo
       const fbComment = post.fbComment || post.product?.affiliateUrl;
       const fbRes = await publishToFacebook(acc.accountId, acc.accessToken, fbText, post.product?.imageUrl, fbComment);
       results.facebook = fbRes;
+      // Update post with FB id if success
+      if (fbRes.success && fbRes.id) {
+        await prisma.contentPost.update({
+          where: { id: post.id },
+          data: { facebookPostId: fbRes.id },
+        });
+      }
     } else if (acc.platform === "X") {
       if (post.xPostId) {
         console.log(`[PUBLISHER] X already published for post ${postId}. Skipping.`);
@@ -306,6 +320,13 @@ export async function publishToAllPlatforms(postId: string): Promise<MultiPlatfo
 
       const xRes = await publishToX(activeToken, xText);
       results.x = xRes;
+      // Update post with X id if success
+      if (xRes.success && xRes.id) {
+        await prisma.contentPost.update({
+          where: { id: post.id },
+          data: { xPostId: xRes.id },
+        });
+      }
     }
   }
 
