@@ -20,14 +20,17 @@ export async function GET() {
     });
   }
 
-  const settings = await prisma.automationSettings.findFirst({
-    where: { enabled: true },
-  });
-
-  const accessToken = settings?.threadsAccessToken || process.env.THREADS_ACCESS_TOKEN;
+  // Note: We don't fetch a global settings object anymore because we do it per-post.
+  // We keep results array for tracking synced items
   const results = [];
 
   for (const post of publishedPosts) {
+    // Dynamic token fetch per user to support true multi-tenant
+    const postSettings = await prisma.automationSettings.findUnique({
+      where: { userId: post.userId }
+    });
+    const accessToken = postSettings?.threadsAccessToken || process.env.THREADS_ACCESS_TOKEN;
+
     let views = 0;
     let likes = 0;
     let replies = 0;
@@ -58,16 +61,8 @@ export async function GET() {
       }
     }
 
-    // If views are 0 (e.g. simulated post or Insights not populated yet), generate realistic performance baseline
-    if (views === 0) {
-      // Calculate realistic baseline based on post age
-      const hoursAgo = Math.max(1, Math.floor((Date.now() - (post.publishedAt?.getTime() ?? Date.now())) / (1000 * 60 * 60)));
-      views = Math.min(3200, 150 + hoursAgo * 85);
-      likes = Math.floor(views * 0.045);
-      replies = Math.floor(views * 0.012);
-      reposts = Math.floor(views * 0.008);
-      quotes = Math.floor(views * 0.003);
-    }
+    // Insights from official Threads API
+    // Zero baseline if not viewed yet - strictly authentic metrics without mock data
 
     const totalEngagements = likes + replies + reposts + quotes;
     const engagementRate = views > 0 ? (totalEngagements / views) * 100 : 0;
