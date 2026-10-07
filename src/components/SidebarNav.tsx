@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { LogOut, Home, ListTodo, Package, Calendar, Settings, Activity, Menu, X, Users } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import { useState } from "react";
+import InstallPwaButton from "./InstallPwaButton";
 
 export default function SidebarNav() {
   const pathname = usePathname();
@@ -33,7 +34,10 @@ export default function SidebarNav() {
     <>
       {/* Mobile Header Toggle */}
       <div className="md:hidden flex flex-row items-center justify-between p-4 bg-white cartoon-border border-b-4 z-50 relative w-full sticky top-0">
-        <h1 className="font-black text-lg text-black tracking-tighter">THREADS<span className="text-main">.AFF</span></h1>
+        <div className="flex items-center gap-3">
+          <h1 className="font-black text-lg text-black tracking-tighter">THREADS<span className="text-main">.AFF</span></h1>
+          <InstallPwaButton />
+        </div>
         <button onClick={toggleMenu} className="cartoon-btn bg-white p-1.5 flex items-center justify-center">
           {isOpen ? <X className="w-6 h-6 stroke-[3]" /> : <Menu className="w-6 h-6 stroke-[3]" />}
         </button>
@@ -91,6 +95,9 @@ export default function SidebarNav() {
 
         {session && (
           <div className="p-5 border-t-[3px] border-[#111111] bg-white">
+            <div className="mb-3 hidden md:block">
+              <InstallPwaButton />
+            </div>
             <div className="flex items-center justify-between mb-3">
               <div className="truncate pr-2">
                 <p className="text-xs font-black text-black truncate">{session.user?.name || "User"}</p>

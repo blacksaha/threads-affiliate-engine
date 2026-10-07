@@ -6,6 +6,7 @@ import AutomationStatusBadge from "@/components/AutomationStatusBadge";
 import { prisma } from "@/lib/prisma";
 import AuthProvider from "@/components/AuthProvider";
 import SidebarNav from "@/components/SidebarNav";
+import { PWAProvider } from "@/components/PWAProvider";
 import { auth } from "@/lib/auth";
 
 const geistSans = Geist({
@@ -21,6 +22,21 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "THREADS AFFILIATE CONTENT ENGINE",
   description: "Hands-off fully automated affiliate content engine for Threads",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "ThreadsEngine",
+  },
+  icons: {
+    icon: [
+      { url: "/icon.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
+  themeColor: "#ffb347",
 };
 
 export default async function RootLayout({
@@ -35,7 +51,10 @@ export default async function RootLayout({
     return (
       <html lang="id" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
         <body className="min-h-full flex flex-col bg-bg text-black font-sans">
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <PWAProvider />
+            {children}
+          </AuthProvider>
         </body>
       </html>
     );
@@ -50,6 +69,7 @@ export default async function RootLayout({
     <html lang="id" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col md:flex-row bg-bg text-black font-sans overflow-x-hidden">
         <AuthProvider>
+          <PWAProvider />
           {/* Responsive Sidebar & Mobile Nav */}
           <div className="shrink-0 flex flex-col">
             <SidebarNav />
