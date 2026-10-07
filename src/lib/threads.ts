@@ -23,7 +23,8 @@ export async function publishThreadChain(
 
   for (let i = 0; i < chain.length; i++) {
     const text = chain[i];
-    const isImagePost = i === 2 && imageUrl && imageUrl.startsWith("http");
+    // Attach image to the FIRST post (hook) so it appears big on the timeline
+    const isImagePost = i === 0 && imageUrl && imageUrl.startsWith("http");
 
     try {
       // Step 1: Create Container

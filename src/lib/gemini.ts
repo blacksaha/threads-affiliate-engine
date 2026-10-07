@@ -321,39 +321,42 @@ Instruksi Kreatif & Gaya Bahasa (ARSITEKTUR 2-STEP COMPACT):
    - Awali dengan observasi nyata, situasi spesifik, atau langsung masuk ke inti cerita secara dewasa dan mengalir santai.
 4. Jangan sampai terlihat jualan di postingan pertama. Dilarang hashtag berlebihan.${antiRepetitionRule}
 
-Alur 2-Langkah Wajib:
-- Post 1 (Main Post / Hook): Panjang TEKS MAKSIMAL 150 KARAKTER. Tembak langsung masalah + klaim mutlak atau pura-pura minta review (Curiosity Inverted). Curhat masalah harian secara relatable. Asumsikan akan ditempel Foto/Video. JANGAN taruh link di Post 1.
-- Post 2 (First Reply / CTA): Tulis kalimat singkat natural memberikan Link Pembelian (CTA). Contoh: "Banyak yg nanya, aku spill tokonya di sini ya mumpung diskon 👇 [affiliateUrl]". Sebutkan harganya (${price}).
+Alur 3-Langkah Wajib (PENTING! Pastikan persis 3 post terpisah):
+- Post 1 (Main Post / Hook): Panjang TEKS MAKSIMAL 150 KARAKTER. Tembak langsung masalah + klaim mutlak atau pura-pura minta review (Curiosity Inverted). Curhat masalah harian secara relatable. Asumsikan akan ditempel Foto Produk. JANGAN taruh link di Post 1.
+- Post 2 (First Reply / Story & Review): Berikan konteks lanjutan, cerita pengalaman nyata, atau tips singkat mengapa produk ini sangat membantu. Fokus pada *value* atau manfaatnya. Maksimal 200 karakter. JANGAN taruh link di Post 2.
+- Post 3 (Second Reply / CTA): Tulis kalimat santai natural memberikan Link Pembelian (CTA) di utas penutup. Contoh: "Banyak yg nanya, aku spill belinya di sini ya mumpung diskon 👇 [affiliateUrl]". Sebutkan harganya (${price}).
 
 Konten Tambahan untuk Multi-Platform:
-- X (Twitter): Teks yang sama dengan Threads (Post 1 dan Post 2).
+- X (Twitter): Teks yang sama dengan Threads (Post 1, Post 2, Post 3).
 - Facebook: Buat 1 postingan lengkap bergaya review personal mendalam. PENTING: JANGAN menyertakan link apapun di dalam teks utama Facebook! Cukup beri arahan halus di akhir kalimat.
 - fbComment: Komentar pertama Facebook berisi link produk promo: misal 'Beli di sini ya kak: [affiliateUrl]'
 
 Format output HANYA JSON object murni:
 {
   "hook": "teks post 1 (maksimal 150 karakter, tanpa link)",
-  "cta": "teks post 2 (reply pertama berisi link dan CTA)",
+  "review": "teks post 2 (cerita/review singkat, tanpa link)",
+  "cta": "teks post 3 (reply penutup berisi link dan CTA)",
   "xContent": "Teks postingan untuk X (Twitter) + Link",
   "fbContent": "Teks ulasan lengkap untuk Facebook Page tanpa link (arahin ke komentar)",
   "fbComment": "Beli di sini ya kak: [affiliateUrl]"
 }
 `;
-  const result = await callGemini(prompt);
+  const result = await callGemini(prompt, aiConfig);
   const clean = extractJson(result);
   const parsed = JSON.parse(clean);
 
   return {
-    hook: parsed.hook || `Ada satu hal yang baru kusadari soal masalah ini...`,
-            cta: parsed.cta || `Harganya cuma ${price}, cek di sini 👉 ${affiliateUrl}`,
+    hook: parsed.hook || `Ada yang pernah ngalamin masalah ini juga?`,
+    review: parsed.review || `Barang ini ngebantu banget buat aku sih.`,
+    cta: parsed.cta || `Kebetulan lagi ada promo harganya ${price}, cek aja di sini 👉 ${affiliateUrl}`,
     story: "",
-    review: "",
     chain: [
-      parsed.hook || `Satu hal yang bikin sadar...`,
-      parsed.cta || `Cek promo di ${affiliateUrl}`,
+      parsed.hook || `Ada masalah ini?`,
+      parsed.review || `Ini solusinya.`,
+      parsed.cta || `Link: ${affiliateUrl}`,
     ],
-    xContent: parsed.xContent || parsed.hook,
-    fbContent: parsed.fbContent || `${parsed.hook}\n\n${parsed.story}\n\n${parsed.review}\n\n👉 Info pembelian & link tokonya sudah aku sematkan di komentar pertama ya 👇`,
+    xContent: parsed.xContent || `${parsed.hook}\n\n${parsed.review}\n\n👉 Cek promo: ${affiliateUrl}`,
+    fbContent: parsed.fbContent || `${parsed.hook}\n\n${parsed.review}\n\n👉 Info dan link produk sudah disematkan di komentar pertama ya 👇`,
     fbComment: parsed.fbComment || `Beli di sini ya kak: ${affiliateUrl}`
   };
 }
@@ -387,9 +390,10 @@ Instruksi Kreatif:
    - Buka langsung dengan pernyataan fakta, tips solutif, atau observasi menarik yang tenang dan berwawasan.
 4. Hanya di akhir cerita/tips, sebutkan bahwa produk rekomendasi (${productName}) adalah salah satu alat bantu yang mempermudah hal tersebut.
 
-Alur 2-Langkah:
-- Post 1 (Main Post / Hook): Opini atau fakta menarik / keresahan nyata seputar tema "${theme}". Padatkan tips/edukasi dalam postingan ini. Panjang maksimal 180 karakter. Jangan sertakan link.
-- Post 2 (First Reply / CTA): Cerita singkat bagaimana produk ${productName} membantu, sebutkan harga ${price} dan link Shopee (${affiliateUrl}).
+Alur 3-Langkah Wajib (Pastikan persis 3 post terpisah):
+- Post 1 (Main Post / Hook): Opini atau fakta menarik / keresahan nyata seputar tema "${theme}". Padatkan tips/edukasi dalam postingan ini. Panjang maksimal 180 karakter. Jangan sertakan link. Asumsikan ada Foto Produk.
+- Post 2 (First Reply / Insight & Tips): Penjelasan lanjutan yang solutif dan bernilai tambah. Maksimal 200 karakter. Jangan sertakan link.
+- Post 3 (Second Reply / CTA): Cerita singkat bagaimana produk ${productName} membantu, sebutkan harga ${price} dan link Shopee (${affiliateUrl}).
 
 Konten Facebook Page:
 - Satu tulisan panjang lengkap yang sangat bermanfaat untuk dibaca followers tentang "${theme}".
@@ -398,7 +402,8 @@ Konten Facebook Page:
 Format output HANYA JSON object murni:
 {
   "hook": "teks post 1 (tips padat, maks 180 chars)",
-  "cta": "teks post 2 (kaitan solusi dan link affiliate)",
+  "review": "teks post 2 (insight lanjutan)",
+  "cta": "teks post 3 (kaitan solusi dan link affiliate)",
   "xContent": "Teks untuk X (Twitter) + Link",
   "fbContent": "Teks ulasan/artikel Facebook tanpa link",
   "fbComment": "Beli ${productName} resmi di sini ya kak: ${affiliateUrl}"
@@ -411,15 +416,16 @@ Format output HANYA JSON object murni:
 
   return {
     hook: parsed.hook || `Satu hal penting tentang ${theme} yang jarang dibahas orang:`,
-            cta: parsed.cta || `Harganya cuma ${price}, cek promo di sini 👉 ${affiliateUrl}`,
+    review: parsed.review || `Intinya ada kebiasaan kecil yang sering kita abaikan.`,
+    cta: parsed.cta || `Harganya cuma ${price}, cek promo di sini 👉 ${affiliateUrl}`,
     story: "",
-    review: "",
     chain: [
       parsed.hook || `Tips tentang ${theme}:`,
+      parsed.review || `Penjelasan lanjutan.`,
       parsed.cta || `Cek promo di ${affiliateUrl}`,
     ],
-    xContent: parsed.xContent || parsed.hook,
-    fbContent: parsed.fbContent || `${parsed.hook}\n\n${parsed.story}\n\n${parsed.review}\n\n👉 Info dan link ${productName} sudah disematkan di komentar pertama ya 👇`,
+    xContent: parsed.xContent || `${parsed.hook}\n\n${parsed.review}\n\n👉 Cek info: ${affiliateUrl}`,
+    fbContent: parsed.fbContent || `${parsed.hook}\n\n${parsed.review}\n\n👉 Info dan link ${productName} sudah disematkan di komentar pertama ya 👇`,
     fbComment: parsed.fbComment || `Beli di sini ya kak: ${affiliateUrl}`
   };
 }
