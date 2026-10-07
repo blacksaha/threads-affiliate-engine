@@ -1,18 +1,29 @@
-# Drives the automation engine on a 10-minute cadence.
+# Drives the automation engine from the cloud.
 #
-# Why GitHub Actions instead of Vercel Cron: the Vercel project runs on the Hobby
-# plan, which only allows cron jobs that fire once per day. GitHub Actions has no
-# such limit for public repositories, so it calls the same endpoints.
+# Why GitHub Actions in addition to the local Hermes cron: the local job only runs
+# while this machine is awake. This workflow keeps the scheduler ticking and, more
+# importantly, is the only thing that calls /api/cron/analytics on a cadence - the
+# analytics endpoint had no automation at all before this file existed, so the AI
+# feedback loop never refreshed on its own.
 #
-# The schedule is intentionally duplicated from vercel.json: the Vercel entries are
-# a once-daily safety net in case Actions is ever disabled or the repo goes private.
+# Vercel Cron cannot do this: the project is on the Hobby plan, which only allows
+# cron entries that fire once per day (see vercel.json, kept as a safety net).
 name: Cron Automation
 
 on:
   schedule:
     - cron: '*/10 * * * *'   # scheduler: publish due posts + recover failed pipelines
-    - cron: '15 */2 * * *'   # analytics: sync Threads insights
-  workflow_dispatch:          # allow manual runs from the Actions tab
+    - cron: '15 */2 * * *'   # analytics: sync Threads insights into the feedback loop
+  workflow_dispatch:
+    inputs:
+      endpoint:
+        description: Which cron endpoint to call
+        type: choice
+        required: true
+        default: scheduler
+        options:
+          - scheduler
+          - analytics
 
 # Never let two runs overlap: the engine has its own idempotency locks, but a
 # queue of overlapping runs would waste minutes and hammer the database.
@@ -26,8 +37,13 @@ jobs:
     steps:
       - name: Determine which endpoint to call
         id: pick
+        env:
+          EVENT_SCHEDULE: ${{ github.event.schedule }}
+          DISPATCH_INPUT: ${{ github.event.inputs.endpoint }}
         run: |
-          if [ "${{ github.event.schedule }}" = "15 */2 * * *" ]; then
+          # Manual run: honour the chosen input.
+          # Scheduled run: the analytics entry is the one at minute 15 past even hours.
+          if [ "${DISPATCH_INPUT:-}" = "analytics" ] || [ "${EVENT_SCHEDULE:-}" = "15 */2 * * *" ]; then
             echo "path=api/cron/analytics" >> "$GITHUB_OUTPUT"
           else
             echo "path=api/cron/scheduler" >> "$GITHUB_OUTPUT"
