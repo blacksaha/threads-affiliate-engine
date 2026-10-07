@@ -64,6 +64,11 @@ export async function runProductPipeline(productId: string, userId = 'default_us
     create: { userId },
   });
 
+  const aiConfig = {
+    provider: settings.aiProvider || "GEMINI",
+    apiKey: settings.aiApiKey || null,
+  };
+
   // 1. Assign angle if product has none (Quick archetype selection without LLM latency)
   let angle = product.angles[0];
   if (!angle) {
@@ -116,7 +121,8 @@ export async function runProductPipeline(productId: string, userId = 'default_us
           themeOverride,
           product.name,
           product.price,
-          product.affiliateUrl
+          product.affiliateUrl,
+          aiConfig
         );
       } else {
         draft = await generateThreadContent(
@@ -125,7 +131,8 @@ export async function runProductPipeline(productId: string, userId = 'default_us
           product.affiliateUrl,
           angle.angleType,
           angle.description,
-          previousHooks
+          previousHooks,
+          aiConfig
         );
       }
 

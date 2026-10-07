@@ -106,6 +106,10 @@ model AutomationSettings {
   timezone                String   @default("Asia/Makassar")
   similarityThreshold     Float    @default(0.7)
 
+  // AI Configuration (Multi-tenant)
+  aiProvider              String   @default("GEMINI") // "GEMINI" or "DEEPSEEK"
+  aiApiKey                String?  // user's custom API key (or null to fallback to system/owner key)
+
   threadsUserId      String?
   threadsAccessToken String?
   threadsConnected   Boolean  @default(false)

@@ -47,6 +47,8 @@ export interface CallGeminiOptions {
    * kill the function, losing the request entirely.
    */
   deadlineMs?: number;
+  provider?: string;
+  apiKey?: string | null;
 }
 
 const HOOK_ARCHETYPES = [
@@ -99,7 +101,48 @@ function extractJson(text: string): string {
 }
 
 export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): Promise<string> {
-  if (GEMINI_API_KEYS.length === 0) {
+  const isDeepSeek = opts.provider === "DEEPSEEK";
+
+  if (isDeepSeek) {
+    const dsKey = opts.apiKey || process.env.DEEPSEEK_API_KEY;
+    if (!dsKey) throw new Error("DeepSeek API Key is not configured.");
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), opts.timeoutMs || 40000);
+    try {
+      const res = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${dsKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          messages: [
+            { role: "system", content: "You are a professional Indonesian content creator and copywriter." },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.7,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error(`DeepSeek Error ${res.status}: ${await res.text()}`);
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content || "";
+      if (content.trim()) return content.trim();
+      throw new Error("Empty response from DeepSeek API");
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      throw new Error(`DeepSeek API failed: ${err.message}`);
+    }
+  }
+
+  // If user provided custom Google Gemini API Key
+  const customKey = opts.apiKey;
+  const activeKeys = customKey ? [customKey] : GEMINI_API_KEYS;
+
+  if (activeKeys.length === 0) {
     throw new Error("GEMINI_API_KEY is not configured.");
   }
 
@@ -108,10 +151,8 @@ export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): 
   const startedAt = Date.now();
   let lastError: unknown = null;
 
-  // Outer loop = rounds. Inner loops = every model x every key, so a transient
-  // 503/429 on one key never costs us the whole request.
+  // Outer loop = rounds. Inner loops = every model x every key
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    // Stop before the serverless function is killed mid-request.
     if (Date.now() - startedAt >= deadlineMs) {
       console.warn(`[GEMINI] Deadline of ${deadlineMs}ms reached before round ${round + 1}.`);
       break;
@@ -125,13 +166,11 @@ export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): 
     }
 
     for (const model of CANDIDATE_MODELS) {
-      // Try EVERY available API key before moving to the next model.
-      for (let keyAttempt = 0; keyAttempt < GEMINI_API_KEYS.length; keyAttempt++) {
+      for (let keyAttempt = 0; keyAttempt < activeKeys.length; keyAttempt++) {
         if (Date.now() - startedAt >= deadlineMs) break;
 
-        const apiKey = getNextApiKey();
+        const apiKey = customKey || getNextApiKey();
         const controller = new AbortController();
-        // Never let one request outlive the remaining budget.
         const remaining = deadlineMs - (Date.now() - startedAt);
         const timeoutId = setTimeout(() => controller.abort(), Math.max(1000, Math.min(timeoutMs, remaining)));
 
@@ -147,16 +186,12 @@ export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): 
             signal: controller.signal,
           });
 
-          // 503 = model capacity, not our key's fault. Rotate the key first;
-          // the round backoff above is what actually gives it time to recover.
           if (response.status === 503) {
             console.warn(`[GEMINI] Model ${model} overloaded (503). Rotating key...`);
             lastError = "Server overloaded (503)";
             continue;
           }
 
-          // 429 = this key is rate limited. 403/400 = this key is unusable
-          // (denied project / bad request) so there is no point retrying it.
           if (response.status === 429 || response.status === 403 || response.status === 400) {
             console.warn(`[GEMINI] Model ${model} returned ${response.status} on key. Rotating to next API Key...`);
             lastError = `Status ${response.status} on key - Switching Key`;
@@ -199,7 +234,7 @@ export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): 
 /**
  * 1. Product Analysis & Content Angles
  */
-export async function generateProductAngles(productName: string, price: string, description?: string) {
+export async function generateProductAngles(productName: string, price: string, description?: string, aiConfig?: CallGeminiOptions) {
   // Query top performing angles for context
   const topAngles = await prisma.contentAngle.findMany({
     where: { posts: { some: { analytics: { isTopPerformer: true } } } },
@@ -227,7 +262,7 @@ Format output HANYA JSON array murni:
 ]
 `;
   try {
-    const result = await callGemini(prompt);
+    const result = await callGemini(prompt, aiConfig);
     const clean = extractJson(result);
     return JSON.parse(clean);
   } catch (err) {
@@ -249,7 +284,8 @@ export async function generateThreadContent(
   affiliateUrl: string,
   angleType: string,
   angleDesc: string,
-  previousHooks: string[] = []
+  previousHooks: string[] = [],
+  aiConfig?: CallGeminiOptions
 ): Promise<ThreadPostDraft> {
   // Query top performing hooks for learning
   const topHooks = await prisma.contentPost.findMany({
@@ -326,7 +362,8 @@ export async function generateThematicContent(
   theme: string,
   productName: string,
   price: string,
-  affiliateUrl: string
+  affiliateUrl: string,
+  aiConfig?: CallGeminiOptions
 ): Promise<ThreadPostDraft> {
   const prompt = `
 Kamu adalah seorang content creator profesional, cerdas, dan disukai netizen di media sosial (Threads, X, dan Facebook).
@@ -364,7 +401,7 @@ Format output HANYA JSON object murni:
 }
 `;
 
-  const result = await callGemini(prompt);
+  const result = await callGemini(prompt, aiConfig);
   const clean = extractJson(result);
   const parsed = JSON.parse(clean);
 

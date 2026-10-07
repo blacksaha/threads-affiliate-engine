@@ -17,6 +17,8 @@ type Settings = {
   postingTimes: string;
   timezone: string;
   similarityThreshold: number;
+  aiProvider: string;
+  aiApiKey: string | null;
   threadsUserId: string | null;
   threadsAccessToken: string | null;
   threadsConnected: boolean;
@@ -126,6 +128,39 @@ export default function SettingsClientForm({ initialSettings }: { initialSetting
               className="w-4 h-4 text-indigo-600 rounded bg-slate-800 border-slate-700"
             />
           </label>
+        </div>
+      </div>
+
+      {/* AI Configuration */}
+      <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
+        <h2 className="text-lg font-bold text-white">AI Content Engine</h2>
+        <p className="text-xs text-slate-400">
+          Pilih otak AI yang akan membedah produk dan menyusun copywriting utas.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">AI Provider</label>
+            <select
+              value={settings.aiProvider || "GEMINI"}
+              onChange={(e) => setSettings((s) => ({ ...s, aiProvider: e.target.value }))}
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
+            >
+              <option value="GEMINI">Google Gemini (Flash)</option>
+              <option value="DEEPSEEK">DeepSeek (Chat V3)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Custom API Key</label>
+            <input
+              type="password"
+              value={settings.aiApiKey || ""}
+              onChange={(e) => setSettings((s) => ({ ...s, aiApiKey: e.target.value }))}
+              placeholder="Biarkan kosong untuk pakai key sistem (Admin only)"
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
+            />
+          </div>
         </div>
       </div>
 

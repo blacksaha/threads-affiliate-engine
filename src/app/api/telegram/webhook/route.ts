@@ -175,10 +175,18 @@ export async function POST(request: Request) {
       await sendTelegramMessage(token, chatId, "⏳ Sedang membedah produk dengan AI...");
 
       try {
+        const settings = await prisma.automationSettings.findUnique({
+          where: { userId: targetUserId }
+        });
+        const aiConfig = {
+          provider: settings?.aiProvider || "GEMINI",
+          apiKey: settings?.aiApiKey || null,
+        };
+
         const prompt = EXTRACTOR_PROMPT.replace("{MESSAGE}", text);
         // Hard 20s ceiling: the webhook must stay well inside maxDuration=60 and
         // the regex fallback below is fast and reliable.
-        const extractedText = await callGemini(prompt, { deadlineMs: 20000 });
+        const extractedText = await callGemini(prompt, { deadlineMs: 20000, ...aiConfig });
         const parsed = JSON.parse(extractJson(extractedText));
 
         await sendTelegramMessage(token, chatId, `📦 *Produk Terdeteksi!*\nNama: ${parsed.name}\nHarga: Rp ${parsed.price}\n\n⚙️ Memasukkan ke Pipeline Engine...`);
