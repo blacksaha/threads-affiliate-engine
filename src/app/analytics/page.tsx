@@ -35,9 +35,9 @@ export default async function AnalyticsPage() {
   return (
     <div className="space-y-6 pb-20">
       <div>
-        <h1 className="text-3xl font-black text-black tracking-tight uppercase">Performance & AI Loop</h1>
+        <h1 className="text-3xl font-black text-black tracking-tight uppercase">Multi-Platform Analytics</h1>
         <p className="text-sm font-bold text-gray-700">
-          Metrik performa Threads & Feedback Loop untuk optimasi konten AI.
+          Metrik performa gabungan (Threads, Facebook, X) & Feedback Loop untuk optimasi konten AI.
         </p>
       </div>
 
