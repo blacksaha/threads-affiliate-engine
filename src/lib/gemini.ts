@@ -49,6 +49,7 @@ export interface CallGeminiOptions {
   deadlineMs?: number;
   provider?: string;
   apiKey?: string | null;
+  baseUrl?: string | null;
 }
 
 const HOOK_ARCHETYPES = [
@@ -107,10 +108,13 @@ export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): 
     const dsKey = opts.apiKey || process.env.DEEPSEEK_API_KEY;
     if (!dsKey) throw new Error("DeepSeek API Key is not configured.");
 
+    let base = (opts.baseUrl || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").trim().replace(/\/+$/, "");
+    const endpoint = base.endsWith("/chat/completions") ? base : `${base}/chat/completions`;
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), opts.timeoutMs || 40000);
     try {
-      const res = await fetch("https://api.deepseek.com/chat/completions", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${dsKey}`,

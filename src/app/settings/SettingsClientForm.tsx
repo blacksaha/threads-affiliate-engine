@@ -19,6 +19,7 @@ type Settings = {
   similarityThreshold: number;
   aiProvider: string;
   aiApiKey: string | null;
+  aiBaseUrl: string | null;
   threadsUserId: string | null;
   threadsAccessToken: string | null;
   threadsConnected: boolean;
@@ -147,7 +148,7 @@ export default function SettingsClientForm({ initialSettings }: { initialSetting
               className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
             >
               <option value="GEMINI">Google Gemini (Flash)</option>
-              <option value="DEEPSEEK">DeepSeek (Chat V3)</option>
+              <option value="DEEPSEEK">DeepSeek (Chat V3 / Proxy)</option>
             </select>
           </div>
 
@@ -161,6 +162,24 @@ export default function SettingsClientForm({ initialSettings }: { initialSetting
               className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
             />
           </div>
+
+          {settings.aiProvider === "DEEPSEEK" && (
+            <div className="md:col-span-2">
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Custom Base URL / Proxy Server (Opsional)
+              </label>
+              <input
+                type="text"
+                value={settings.aiBaseUrl || ""}
+                onChange={(e) => setSettings((s) => ({ ...s, aiBaseUrl: e.target.value }))}
+                placeholder="https://api.deepseek.com atau https://api.proxyanda.com/v1"
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Kosongkan untuk default resmi (https://api.deepseek.com). Mendukung proxy OpenAI-compatible seperti OpenRouter, One API, Cloudflare dsb.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

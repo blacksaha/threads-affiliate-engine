@@ -109,6 +109,7 @@ model AutomationSettings {
   // AI Configuration (Multi-tenant)
   aiProvider              String   @default("GEMINI") // "GEMINI" or "DEEPSEEK"
   aiApiKey                String?  // user's custom API key (or null to fallback to system/owner key)
+  aiBaseUrl               String?  // custom Base URL (proxy) for OpenAI-compatible/DeepSeek endpoints
 
   threadsUserId      String?
   threadsAccessToken String?

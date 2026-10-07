@@ -181,6 +181,7 @@ export async function POST(request: Request) {
         const aiConfig = {
           provider: settings?.aiProvider || "GEMINI",
           apiKey: settings?.aiApiKey || null,
+          baseUrl: settings?.aiBaseUrl || null,
         };
 
         const prompt = EXTRACTOR_PROMPT.replace("{MESSAGE}", text);

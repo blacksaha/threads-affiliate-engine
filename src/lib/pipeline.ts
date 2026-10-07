@@ -67,6 +67,7 @@ export async function runProductPipeline(productId: string, userId = 'default_us
   const aiConfig = {
     provider: settings.aiProvider || "GEMINI",
     apiKey: settings.aiApiKey || null,
+    baseUrl: settings.aiBaseUrl || null,
   };
 
   // 1. Assign angle if product has none (Quick archetype selection without LLM latency)
