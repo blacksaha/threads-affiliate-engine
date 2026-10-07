@@ -2,6 +2,8 @@ import ProductIngestForm from "@/components/ProductIngestForm";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Sparkles, History, Bot, PackageSearch, Megaphone, Send, Zap, Activity, ListTodo } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +28,7 @@ export default async function DashboardPage() {
 
   const recentLogs = await prisma.systemLog.findMany({
     where: { userId },
-    take: 8,
+    take: 6,
     orderBy: { createdAt: "desc" },
   });
 
@@ -42,118 +44,177 @@ export default async function DashboardPage() {
   });
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
-      {/* Header & Status Banner */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-950 p-6 rounded-2xl border border-slate-800">
-        <div>
-          <div className="flex items-center space-x-3">
-            <span
-              className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                settings?.enabled !== false
-                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                  : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full mr-2 ${settings?.enabled !== false ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`}></span>
-              {settings?.enabled !== false ? "AUTOMATION ACTIVE" : "AUTOMATION PAUSED"}
+    <div className="space-y-6 pb-20">
+      {/* Header Banner */}
+      <div className="cartoon-card bg-amber-300 p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 transform -rotate-1 hover:rotate-0">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="cartoon-badge px-3 py-1 bg-white text-xs flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse border border-black"></span>
+              BOT AKTIF
             </span>
-            <span className="text-xs text-slate-500 font-mono">CRON: ACTIVE (Every 10m)</span>
+            <span className="cartoon-badge px-3 py-1 bg-[#111111] text-white text-xs">
+              CRON: 10m
+            </span>
           </div>
-          <h1 className="text-2xl font-bold text-white mt-2">Executive Control Dashboard</h1>
-          <p className="text-sm text-slate-400">
-            Autonomous Pipeline: Product Analysis → Angle Generation → AI Creation → Anti-Repetition → Auto-Schedule.
+          <h1 className="text-3xl md:text-4xl font-black text-black uppercase tracking-tight">Executive Dashboard</h1>
+          <p className="text-sm font-bold text-gray-800">
+            Pipeline Otomatis: Bedah Produk → Cari Angle → Tulis AI → Jadwal Tayang.
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <form action="/api/cron/scheduler" method="GET" target="_blank">
-            <button
-              type="submit"
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700 transition"
-            >
-              Trigger Cron Scheduler
-            </button>
-          </form>
-        </div>
+        <form action="/api/cron/scheduler" method="GET" target="_blank" className="shrink-0">
+          <button
+            type="submit"
+            className="cartoon-btn px-5 py-3 bg-white text-black hover:bg-gray-100 flex items-center gap-2 text-sm"
+          >
+            <Zap className="w-5 h-5 text-amber-500 fill-amber-500" />
+            PAKSA JALANKAN CRON
+          </button>
+        </form>
       </div>
 
       {/* KPI Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-slate-950/60 p-5 rounded-xl border border-slate-800">
-          <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Total Products</p>
-          <p className="text-3xl font-extrabold text-white mt-2">{productCount}</p>
+        <div className="cartoon-card bg-white p-4 flex flex-col justify-between">
+          <div className="flex items-center gap-2 mb-2 text-blue-500">
+            <PackageSearch className="w-5 h-5 stroke-[2.5]" />
+            <p className="text-xs font-black text-black">PRODUK</p>
+          </div>
+          <p className="text-4xl font-black text-black">{productCount}</p>
         </div>
-        <div className="bg-slate-950/60 p-5 rounded-xl border border-slate-800">
-          <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Generated Content</p>
-          <p className="text-3xl font-extrabold text-indigo-400 mt-2">{totalPosts}</p>
+        <div className="cartoon-card bg-white p-4 flex flex-col justify-between">
+          <div className="flex items-center gap-2 mb-2 text-purple-500">
+            <Bot className="w-5 h-5 stroke-[2.5]" />
+            <p className="text-xs font-black text-black">DRAFT AI</p>
+          </div>
+          <p className="text-4xl font-black text-black">{totalPosts}</p>
         </div>
-        <div className="bg-slate-950/60 p-5 rounded-xl border border-slate-800">
-          <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">In Queue / Scheduled</p>
-          <p className="text-3xl font-extrabold text-amber-400 mt-2">{scheduledCount}</p>
+        <div className="cartoon-card bg-amber-100 p-4 flex flex-col justify-between">
+          <div className="flex items-center gap-2 mb-2 text-amber-600">
+            <History className="w-5 h-5 stroke-[2.5]" />
+            <p className="text-xs font-black text-black">ANTREAN</p>
+          </div>
+          <p className="text-4xl font-black text-black">{scheduledCount}</p>
         </div>
-        <div className="bg-slate-950/60 p-5 rounded-xl border border-slate-800">
-          <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Published</p>
-          <p className="text-3xl font-extrabold text-emerald-400 mt-2">{publishedCount}</p>
+        <div className="cartoon-card bg-emerald-100 p-4 flex flex-col justify-between">
+          <div className="flex items-center gap-2 mb-2 text-emerald-600">
+            <Send className="w-5 h-5 stroke-[2.5]" />
+            <p className="text-xs font-black text-black">TERPUBLIKASI</p>
+          </div>
+          <p className="text-4xl font-black text-black">{publishedCount}</p>
         </div>
-        <div className="bg-slate-950/60 p-5 rounded-xl border border-slate-800">
-          <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Next Scheduled</p>
-          <p className="text-sm font-bold text-slate-200 mt-3 truncate">
-            {nextPost?.scheduledAt ? new Date(nextPost.scheduledAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "None"}
-          </p>
-          <p className="text-xs text-slate-400">
-            {nextPost?.scheduledAt ? new Date(nextPost.scheduledAt).toLocaleDateString("id-ID") : "Waiting for items"}
-          </p>
+        <div className="cartoon-card bg-rose-100 p-4 flex flex-col justify-between">
+          <div className="flex items-center gap-2 mb-2 text-rose-600">
+            <Megaphone className="w-5 h-5 stroke-[2.5]" />
+            <p className="text-xs font-black text-black">JADWAL NEXT</p>
+          </div>
+          <div>
+            <p className="text-lg font-black text-black truncate">
+              {nextPost?.scheduledAt ? new Date(nextPost.scheduledAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "KOSONG"}
+            </p>
+            <p className="text-[10px] font-bold text-gray-700">
+              {nextPost?.scheduledAt ? new Date(nextPost.scheduledAt).toLocaleDateString("id-ID") : "Menunggu produk"}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Two Column Layout: Quick Auto-Runner & Activity Timeline */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left: Instant Product Ingest & Auto-Pipeline */}
-        <div className="lg:col-span-1 bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
-          <h2 className="text-lg font-bold text-white">Input Produk & Auto-Run</h2>
-          <p className="text-xs text-slate-400">
-            Cukup masukkan link Shopee, klik <strong>Tarik Data</strong> untuk auto-scrape nama & gambar, lalu tekan tombol untuk menjalankan pipeline otomatis.
-          </p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Instant Product Ingest */}
+        <div className="lg:col-span-1 space-y-6">
+          <div className="cartoon-card bg-white p-5 space-y-4">
+            <div className="flex items-center gap-2 border-b-3 border-[#111111] pb-3">
+              <Sparkles className="w-5 h-5 text-amber-500 fill-amber-500" />
+              <h2 className="text-lg font-black text-black uppercase">Auto-Run Produk</h2>
+            </div>
+            <p className="text-xs font-bold text-gray-600">
+              Masukkan link Shopee, klik tarik data, lalu jalankan AI.
+            </p>
+            <ProductIngestForm />
+          </div>
 
-          <ProductIngestForm />
+          {/* Activity Logs */}
+          <div className="cartoon-card bg-white p-5">
+             <div className="flex items-center gap-2 border-b-3 border-[#111111] pb-3 mb-4">
+              <Activity className="w-5 h-5 text-blue-500" strokeWidth={3} />
+              <h2 className="text-lg font-black text-black uppercase">System Logs</h2>
+            </div>
+            <div className="space-y-3">
+              {recentLogs.length === 0 ? (
+                <p className="text-xs font-bold text-gray-500">Belum ada log aktivitas.</p>
+              ) : (
+                recentLogs.map((log) => (
+                  <div key={log.id} className="text-xs font-bold border-b-2 border-gray-100 pb-2 last:border-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 border border-gray-400">
+                        {new Date(log.createdAt).toLocaleTimeString("id-ID")}
+                      </span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded border ${
+                        log.level === "ERROR" ? "bg-rose-100 text-rose-700 border-rose-300" : "bg-blue-100 text-blue-700 border-blue-300"
+                      }`}>
+                        {log.source}
+                      </span>
+                    </div>
+                    <p className="text-black line-clamp-2">{log.message}</p>
+                  </div>
+                ))
+              )}
+            </div>
+            <Link href="/logs" className="block text-center mt-4 text-xs font-black text-main hover:underline">
+              LIHAT SEMUA LOGS →
+            </Link>
+          </div>
         </div>
 
-        {/* Right: Live Queue & Activity Logs */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Recent Queue Items */}
-          <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800">
-            <h2 className="text-lg font-bold text-white mb-4">Live Content Queue</h2>
+        {/* Right: Live Queue */}
+        <div className="lg:col-span-2">
+          <div className="cartoon-card bg-white p-5 h-full">
+            <div className="flex items-center justify-between border-b-3 border-[#111111] pb-3 mb-5">
+              <div className="flex items-center gap-2">
+                <ListTodo className="w-5 h-5 text-emerald-500" strokeWidth={3} />
+                <h2 className="text-lg font-black text-black uppercase">Live Content Queue</h2>
+              </div>
+              <Link href="/queue" className="text-xs font-black text-main hover:underline">
+                LIHAT ANTREAN →
+              </Link>
+            </div>
+            
             {recentPosts.length === 0 ? (
-              <p className="text-sm text-slate-500">Belum ada konten di antrean.</p>
+              <div className="flex flex-col items-center justify-center py-10 opacity-50">
+                <Bot className="w-16 h-16 mb-2" />
+                <p className="text-sm font-bold">Belum ada konten di antrean.</p>
+              </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {recentPosts.map((post) => (
                   <div
                     key={post.id}
-                    className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 flex items-start justify-between gap-4"
+                    className="cartoon-card border-2 bg-bg p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center space-x-2">
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          className={`text-[10px] font-black px-2 py-1 rounded border-2 border-[#111111] ${
                             post.status === "PUBLISHED"
-                              ? "bg-emerald-500/20 text-emerald-400"
+                              ? "bg-emerald-300 text-black"
                               : post.status === "SCHEDULED"
-                              ? "bg-amber-500/20 text-amber-400"
-                              : "bg-rose-500/20 text-rose-400"
+                              ? "bg-amber-300 text-black"
+                              : "bg-rose-300 text-black"
                           }`}
                         >
                           {post.status}
                         </span>
-                        <span className="text-xs text-slate-400 font-semibold">{post.product.name}</span>
+                        <span className="text-xs font-black text-gray-800 line-clamp-1">{post.product.name}</span>
                       </div>
-                      <p className="text-sm text-slate-200 line-clamp-2 italic font-serif">
+                      <p className="text-sm text-black font-bold italic line-clamp-2">
                         &quot;{post.hook}&quot;
                       </p>
                     </div>
 
-                    <div className="text-right shrink-0">
-                      <p className="text-xs text-slate-400">
+                    <div className="shrink-0 text-left sm:text-right bg-white p-2 rounded-lg border-2 border-[#111111]">
+                      <p className="text-[10px] font-bold text-gray-500 uppercase">Jadwal Tayang</p>
+                      <p className="text-xs font-black text-black">
                         {post.scheduledAt
                           ? new Date(post.scheduledAt).toLocaleString("id-ID", {
                               day: "numeric",
@@ -163,34 +224,11 @@ export default async function DashboardPage() {
                             })
                           : "-"}
                       </p>
-                      <p className="text-[10px] text-slate-400">Score: {post.qualityScore ?? 0.85}</p>
                     </div>
                   </div>
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Activity Logs */}
-          <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800">
-            <h2 className="text-lg font-bold text-white mb-4">Autonomous System Activity Logs</h2>
-            <div className="space-y-2 text-xs font-mono">
-              {recentLogs.length === 0 ? (
-                <p className="text-slate-500">Belum ada log aktivitas.</p>
-              ) : (
-                recentLogs.map((log) => (
-                  <div key={log.id} className="flex items-start space-x-3 text-slate-400 border-b border-slate-900 py-1.5">
-                    <span className="text-slate-600 shrink-0">
-                      {new Date(log.createdAt).toLocaleTimeString("id-ID")}
-                    </span>
-                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${log.level === "ERROR" ? "bg-rose-950 text-rose-400" : "bg-slate-800 text-slate-300"}`}>
-                      {log.source}
-                    </span>
-                    <span className="text-slate-300">{log.message}</span>
-                  </div>
-                ))
-              )}
-            </div>
           </div>
         </div>
       </div>

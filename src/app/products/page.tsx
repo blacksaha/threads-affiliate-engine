@@ -2,8 +2,8 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
 import ProductCardActions from "@/components/ProductCardActions";
+import { Package, Plus, ExternalLink } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -32,67 +32,75 @@ export default async function ProductsPage() {
   });
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 pb-20">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Database Produk Affiliate</h1>
-          <p className="text-sm text-slate-400">
-            Katalog produk yang terdaftar dalam sistem otomasi konten.
+          <h1 className="text-3xl font-black text-black tracking-tight uppercase">Database Produk</h1>
+          <p className="text-sm font-bold text-gray-700">
+            Katalog produk affiliate yang terdaftar di engine.
           </p>
         </div>
         <Link
           href="/"
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold rounded-lg text-white transition shadow-lg shadow-indigo-600/30"
+          className="cartoon-btn px-4 py-2.5 bg-main hover:bg-amber-400 text-black text-xs font-black flex items-center gap-1.5"
         >
-          + Tambah Produk Baru
+          <Plus className="w-4 h-4 stroke-[3]" />
+          TAMBAH PRODUK
         </Link>
       </div>
 
       {products.length === 0 ? (
-        <div className="bg-slate-950 p-12 rounded-2xl border border-slate-800 text-center space-y-4">
-          <p className="text-slate-400">Belum ada produk yang tersimpan di database.</p>
+        <div className="cartoon-card bg-white p-12 text-center space-y-4">
+          <Package className="w-12 h-12 mx-auto stroke-[2.5] text-gray-400" />
+          <p className="font-bold text-gray-700">Belum ada produk yang tersimpan di database.</p>
           <Link
             href="/"
-            className="inline-block px-4 py-2 bg-slate-800 hover:bg-slate-700 text-sm font-medium rounded-lg text-slate-200"
+            className="cartoon-btn inline-block px-4 py-2 bg-main text-black text-xs font-black"
           >
             Input Produk Pertama di Dashboard
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.map((product) => (
             <div
               key={product.id}
-              className="bg-slate-950 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4 shadow-sm hover:border-slate-700 transition"
+              className="cartoon-card bg-white p-5 flex flex-col justify-between"
             >
               <div className="space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="cartoon-badge px-2 py-0.5 bg-gray-100 text-[10px] font-black">
                     {product.status}
                   </span>
-                  <span className="text-xs font-semibold text-emerald-400">
+                  <span className="cartoon-badge px-2 py-0.5 bg-emerald-200 text-[11px] font-black text-black">
                     Rp {product.price}
                   </span>
                 </div>
 
-                <h2 className="font-bold text-slate-100 text-base line-clamp-2 leading-snug">
+                <h2 className="font-black text-black text-base line-clamp-2 leading-tight">
                   {product.name}
                 </h2>
 
-                <p className="text-xs text-slate-400 font-mono truncate">
-                  🔗 {product.affiliateUrl}
-                </p>
+                <a
+                  href={product.affiliateUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:underline truncate max-w-full"
+                >
+                  <ExternalLink className="w-3 h-3 shrink-0 stroke-[3]" />
+                  <span className="truncate">{product.affiliateUrl}</span>
+                </a>
 
                 {product.angles.length > 0 && (
-                  <div className="pt-2 border-t border-slate-900">
-                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  <div className="pt-2">
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-1.5">
                       Content Angles:
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {product.angles.map((a) => (
                         <span
                           key={a.id}
-                          className="text-[10px] font-medium bg-indigo-950/60 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800/40"
+                          className="text-[9px] font-black bg-amber-100 text-black px-2 py-0.5 rounded border border-[#111111]"
                         >
                           {a.angleType}
                         </span>
@@ -102,10 +110,13 @@ export default async function ProductsPage() {
                 )}
               </div>
 
-              <div className="pt-4 border-t border-slate-900 flex flex-col gap-2">
-                <span className="text-xs text-slate-400">
-                  Total Utas: <strong className="text-slate-200">{product.posts.length}</strong>
-                </span>
+              <div className="pt-3 mt-4 border-t-2 border-gray-100 flex flex-col">
+                <div className="flex items-center justify-between text-xs font-black text-gray-700">
+                  <span>TOTAL UTAS:</span>
+                  <span className="cartoon-badge px-2 py-0.5 bg-blue-100 text-[10px]">
+                    {product.posts.length} Post
+                  </span>
+                </div>
 
                 <ProductCardActions productId={product.id} />
               </div>

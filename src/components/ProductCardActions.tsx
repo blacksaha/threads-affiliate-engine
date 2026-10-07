@@ -57,23 +57,23 @@ export default function ProductCardActions({ productId }: { productId: string })
   };
 
   return (
-    <div className="flex items-center gap-2 mt-3">
+    <div className="flex items-center gap-2 mt-3 pt-3 border-t-2 border-[#111111]">
       <button
         onClick={handleGenerate}
         disabled={isGenerating || isDeleting}
-        className="flex-1 py-1.5 px-3 bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 text-xs text-zinc-300 hover:text-white rounded border border-zinc-700 flex items-center justify-center gap-1.5 transition-colors"
+        className="flex-1 py-2 px-3 bg-white cartoon-btn disabled:opacity-50 text-[10px] font-black flex items-center justify-center gap-1.5"
       >
-        {isGenerating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3 text-yellow-500" />}
-        <span>{isGenerating ? "Membuat..." : "Auto-Generate Utas"}</span>
+        {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />}
+        <span>{isGenerating ? "MEMBUAT..." : "GENERATE AI"}</span>
       </button>
 
       <button
         onClick={handleDelete}
         disabled={isGenerating || isDeleting}
-        className="py-1.5 px-3 bg-red-900/20 hover:bg-red-900/50 disabled:opacity-50 text-xs text-red-400 rounded border border-red-900/30 flex items-center justify-center transition-colors"
+        className="py-2 px-3 bg-rose-400 cartoon-btn disabled:opacity-50 text-white flex items-center justify-center"
         title="Hapus Produk"
       >
-        {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+        {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 stroke-[3]" />}
       </button>
     </div>
   );

@@ -33,114 +33,106 @@ export default async function AnalyticsPage() {
   const topPerformers = publishedPosts.filter((p) => p.analytics?.isTopPerformer);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Content Performance & AI Analytics</h1>
-          <p className="text-sm text-slate-400">
-            Metrik performa Threads & Feedback Loop untuk optimasi konten AI berikutnya.
-          </p>
-        </div>
-
-        <form action="/api/cron/analytics" method="GET" target="_blank">
-          <button
-            type="submit"
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-slate-100 text-xs font-semibold rounded-lg shadow-lg shadow-indigo-600/30 transition cursor-pointer"
-          >
-            ⚡ Sync Performance Data
-          </button>
-        </form>
+    <div className="space-y-6 pb-20">
+      <div>
+        <h1 className="text-3xl font-black text-black tracking-tight uppercase">Performance & AI Loop</h1>
+        <p className="text-sm font-bold text-gray-700">
+          Metrik performa Threads & Feedback Loop untuk optimasi konten AI.
+        </p>
       </div>
+
+      {/* Sync Button */}
+      <form action="/api/cron/analytics" method="GET" target="_blank" className="shrink-0">
+        <button
+          type="submit"
+          className="cartoon-btn px-4 py-2 bg-[#111111] hover:bg-black text-white text-xs font-black flex items-center gap-2"
+        >
+          ⚡ SYNC DATA PERFORMA
+        </button>
+      </form>
 
       {/* KPI Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-slate-950/60 p-5 rounded-xl border border-slate-800">
-          <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Total Published</p>
-          <p className="text-3xl font-extrabold text-white mt-2">{totalPosts}</p>
+        <div className="cartoon-card bg-white p-4">
+          <p className="text-xs font-black text-gray-500 uppercase mb-2">Total Published</p>
+          <p className="text-3xl font-black text-black">{totalPosts}</p>
         </div>
-        <div className="bg-slate-950/60 p-5 rounded-xl border border-slate-800">
-          <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Total Views (Estimated)</p>
-          <p className="text-3xl font-extrabold text-indigo-400 mt-2">{totalViews.toLocaleString("id-ID")}</p>
+        <div className="cartoon-card bg-white p-4">
+          <p className="text-xs font-black text-gray-500 uppercase mb-2">Total Views</p>
+          <p className="text-3xl font-black text-blue-600">{totalViews.toLocaleString("id-ID")}</p>
         </div>
-        <div className="bg-slate-950/60 p-5 rounded-xl border border-slate-800">
-          <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Total Engagements</p>
-          <p className="text-3xl font-extrabold text-emerald-400 mt-2">{(totalLikes + totalReplies).toLocaleString("id-ID")}</p>
+        <div className="cartoon-card bg-white p-4">
+          <p className="text-xs font-black text-gray-500 uppercase mb-2">Total Engage</p>
+          <p className="text-3xl font-black text-emerald-600">{(totalLikes + totalReplies).toLocaleString("id-ID")}</p>
         </div>
-        <div className="bg-slate-950/60 p-5 rounded-xl border border-slate-800">
-          <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Avg Engagement Rate</p>
-          <p className="text-3xl font-extrabold text-amber-400 mt-2">{avgEngagement}%</p>
-        </div>
-      </div>
-
-      {/* AI Learning Feedback Loop Banner */}
-      <div className="bg-gradient-to-r from-indigo-950/80 via-purple-950/50 to-slate-950 border border-indigo-500/30 rounded-2xl p-6">
-        <div className="flex items-start space-x-3">
-          <span className="text-2xl">🧠</span>
-          <div className="space-y-1">
-            <h2 className="text-base font-bold text-indigo-200">
-              Autonomous AI Optimization Active (Feedback Loop)
-            </h2>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Sistem secara otomatis mempelajari pola kalimat, gaya *hook*, dan sudut pandang (*angle*) dari konten yang mendapatkan interaksi tertinggi ({topPerformers.length} konten unggulan terdeteksi). Hasil analisis ini disuntikkan sebagai pedoman saat AI memproduksi naskah baru.
-            </p>
-          </div>
+        <div className="cartoon-card bg-white p-4">
+          <p className="text-xs font-black text-gray-500 uppercase mb-2">Avg Engagement</p>
+          <p className="text-3xl font-black text-amber-600">{avgEngagement}%</p>
         </div>
       </div>
 
-      {/* Published Posts Performance Table */}
-      <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6">
-        <h2 className="text-lg font-bold text-white mb-4">Performance Log</h2>
+      {/* AI Learning Banner */}
+      <div className="cartoon-card bg-gradient-to-r from-indigo-100 to-purple-100 p-6 flex items-start gap-4 transform -rotate-1">
+        <span className="text-3xl shrink-0">🧠</span>
+        <div>
+          <h2 className="text-sm font-black text-indigo-900 uppercase mb-1">AI Autonomous Optimization Active!</h2>
+          <p className="text-xs font-bold text-gray-800 leading-relaxed">
+            Sistem mempelajari pola hook dan angle dari {topPerformers.length} top performer. Hasil analisis disuntikkan langsung ke AI generator berikutnya! 🎯
+          </p>
+        </div>
+      </div>
+
+      {/* Performance Table */}
+      <div className="cartoon-card bg-white overflow-hidden">
+        <div className="px-5 py-4 border-b-2 border-[#111111]">
+          <h2 className="text-lg font-black text-black uppercase">Performance Log</h2>
+        </div>
 
         {publishedPosts.length === 0 ? (
-          <div className="py-12 text-center text-slate-400 text-sm">
-            Belum ada postingan yang berstatus PUBLISHED. Setelah scheduler mempublish konten, data performa akan muncul di sini.
+          <div className="py-12 text-center">
+            <p className="text-sm font-bold text-gray-600">Belum ada data performa. Tunggu sampai scheduler mempublish postingan.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="border-b border-slate-800 text-slate-400 uppercase tracking-wider font-semibold">
+            <table className="w-full text-left text-xs text-gray-700">
+              <thead className="bg-gray-100 text-[10px] font-black uppercase text-black sticky top-0">
                 <tr>
-                  <th className="py-3 px-4">Produk & Hook</th>
-                  <th className="py-3 px-4">Angle</th>
-                  <th className="py-3 px-4 text-center">Views</th>
-                  <th className="py-3 px-4 text-center">Likes</th>
-                  <th className="py-3 px-4 text-center">Replies</th>
-                  <th className="py-3 px-4 text-center">Engage Rate</th>
-                  <th className="py-3 px-4 text-center">AI Status</th>
+                  <th className="px-4 py-3 border-2 border-[#111111]">Produk & Hook</th>
+                  <th className="px-4 py-3 border-2 border-[#111111]">Angle</th>
+                  <th className="px-4 py-3 border-2 border-[#111111] text-center">Views</th>
+                  <th className="px-4 py-3 border-2 border-[#111111] text-center">Likes</th>
+                  <th className="px-4 py-3 border-2 border-[#111111] text-center">Engage Rate</th>
+                  <th className="px-4 py-3 border-2 border-[#111111] text-center">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-900">
+              <tbody className="divide-y-2 divide-gray-200">
                 {publishedPosts.map((post) => (
-                  <tr key={post.id} className="hover:bg-slate-900/40 transition">
-                    <td className="py-3.5 px-4 max-w-xs">
-                      <p className="font-semibold text-white truncate">{post.product.name}</p>
-                      <p className="text-slate-400 italic line-clamp-1 mt-0.5">&quot;{post.hook}&quot;</p>
+                  <tr key={post.id} className="hover:bg-amber-50 transition">
+                    <td className="px-4 py-3.5 max-w-xs">
+                      <p className="font-black text-black truncate">{post.product.name}</p>
+                      <p className="text-gray-600 italic line-clamp-1 mt-0.5">"{post.hook}"</p>
                     </td>
-                    <td className="py-3.5 px-4">
-                      <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded text-[10px]">
+                    <td className="px-4 py-3.5">
+                      <span className="cartoon-badge bg-white text-black px-2 py-0.5 text-[10px]">
                         {post.angle?.angleType || "General"}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 text-center font-mono">
+                    <td className="px-4 py-3.5 text-center font-mono font-bold">
                       {post.analytics?.views?.toLocaleString("id-ID") ?? 0}
                     </td>
-                    <td className="py-3.5 px-4 text-center font-mono text-emerald-400">
+                    <td className="px-4 py-3.5 text-center font-mono font-bold text-emerald-600">
                       {post.analytics?.likes ?? 0}
                     </td>
-                    <td className="py-3.5 px-4 text-center font-mono text-indigo-400">
-                      {post.analytics?.replies ?? 0}
+                    <td className="px-4 py-3.5 text-center font-mono font-black text-amber-600">
+                      {(post.analytics?.engagementRate ?? 0).toFixed(2)}%
                     </td>
-                    <td className="py-3.5 px-4 text-center font-mono font-bold text-amber-400">
-                      {post.analytics?.engagementRate?.toFixed(2) ?? "0.00"}%
-                    </td>
-                    <td className="py-3.5 px-4 text-center">
+                    <td className="px-4 py-3.5 text-center">
                       {post.analytics?.isTopPerformer ? (
-                        <span className="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full text-[10px] font-bold">
-                          ⭐ Top Performer
+                        <span className="cartoon-badge bg-amber-300 text-black text-[9px] px-2 py-0.5">
+                          ⭐ TOP PERFORMER
                         </span>
                       ) : (
-                        <span className="text-slate-500 text-[10px]">Standard</span>
+                        <span className="text-[10px] font-bold text-gray-400">Standard</span>
                       )}
                     </td>
                   </tr>

@@ -22,14 +22,12 @@ export default async function QueuePage() {
   });
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Content Queue</h1>
-          <p className="text-sm text-slate-400">
-            Daftar konten yang telah digenerate AI. Semua dijadwalkan secara otomatis.
-          </p>
-        </div>
+    <div className="space-y-6 pb-20">
+      <div>
+        <h1 className="text-3xl font-black text-black tracking-tight uppercase">Content Queue</h1>
+        <p className="text-sm font-bold text-gray-700">
+          Daftar antrean postingan otomatis ke Threads, X, dan Facebook Page.
+        </p>
       </div>
 
       <QueueClientView initialPosts={posts} />

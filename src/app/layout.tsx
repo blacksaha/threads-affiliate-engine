@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
 import "./globals.css";
 
 import AutomationStatusBadge from "@/components/AutomationStatusBadge";
@@ -31,12 +30,11 @@ export default async function RootLayout({
 }>) {
   const session = await auth();
   const userId = session?.user?.id;
-  const userRole = (session?.user as any)?.role || "USER";
 
   if (!userId) {
     return (
       <html lang="id" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-        <body className="min-h-full flex bg-slate-900 text-slate-100 font-sans">
+        <body className="min-h-full flex flex-col bg-bg text-black font-sans">
           <AuthProvider>{children}</AuthProvider>
         </body>
       </html>
@@ -50,17 +48,21 @@ export default async function RootLayout({
 
   return (
     <html lang="id" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex bg-slate-900 text-slate-100 font-sans">
+      <body className="min-h-full flex flex-col md:flex-row bg-bg text-black font-sans overflow-x-hidden">
         <AuthProvider>
-          {/* Sidebar Nav */}
-          <aside className="w-64 border-r border-slate-800 bg-slate-950 flex flex-col justify-between shrink-0">
+          {/* Responsive Sidebar & Mobile Nav */}
+          <div className="shrink-0 flex flex-col">
             <SidebarNav />
-            <AutomationStatusBadge initialEnabled={isEnabled} />
-          </aside>
+            <div className="hidden md:block">
+              <AutomationStatusBadge initialEnabled={isEnabled} />
+            </div>
+          </div>
 
-          {/* Main Workspace */}
-          <main className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-slate-900">
-            {children}
+          {/* Main Content Area */}
+          <main className="flex-1 min-w-0 min-h-screen overflow-y-auto p-4 sm:p-6 lg:p-8">
+            <div className="max-w-7xl mx-auto">
+              {children}
+            </div>
           </main>
         </AuthProvider>
       </body>

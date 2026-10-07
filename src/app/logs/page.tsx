@@ -19,32 +19,32 @@ export default async function LogsPage() {
   });
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6 pb-20">
       <div>
-        <h1 className="text-2xl font-bold text-white">System Activity Logs</h1>
-        <p className="text-sm text-slate-400">
-          Laporan aktivitas otomatis, keputusan AI Pipeline, dan pengiriman API Threads.
+        <h1 className="text-3xl font-black text-black tracking-tight uppercase">System Logs</h1>
+        <p className="text-sm font-bold text-gray-700">
+          Laporan aktivitas otomatis, keputusan AI Pipeline, dan pengiriman API.
         </p>
       </div>
 
-      <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 overflow-hidden">
+      <div className="cartoon-card bg-white overflow-hidden">
         {logs.length === 0 ? (
-          <p className="text-slate-400 text-center py-12 text-sm">Belum ada aktivitas di sistem.</p>
+          <p className="font-bold text-gray-500 text-center py-12 text-sm">Belum ada aktivitas di sistem.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="border-b border-slate-800 text-slate-400 uppercase tracking-wider font-semibold">
+            <table className="w-full text-left text-xs text-gray-700">
+              <thead className="bg-gray-100 text-[10px] font-black uppercase text-black">
                 <tr>
-                  <th className="py-3 px-4 w-48">Timestamp</th>
-                  <th className="py-3 px-4 w-24">Level</th>
-                  <th className="py-3 px-4 w-40">Source</th>
-                  <th className="py-3 px-4">Message</th>
+                  <th className="px-4 py-3 border-2 border-[#111111] w-48">WAKTU</th>
+                  <th className="px-4 py-3 border-2 border-[#111111] w-24">LEVEL</th>
+                  <th className="px-4 py-3 border-2 border-[#111111] w-36">SUMBER</th>
+                  <th className="px-4 py-3 border-2 border-[#111111]">PESAN</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-900/60 font-mono">
+              <tbody className="divide-y-2 divide-gray-200">
                 {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-900/40 transition">
-                    <td className="py-3 px-4 whitespace-nowrap text-slate-500">
+                  <tr key={log.id} className="hover:bg-amber-50 transition">
+                    <td className="px-4 py-3 whitespace-nowrap font-bold text-gray-600">
                       {new Date(log.createdAt).toLocaleString("id-ID", {
                         month: "short",
                         day: "2-digit",
@@ -53,26 +53,26 @@ export default async function LogsPage() {
                         second: "2-digit",
                       })}
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="px-4 py-3">
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        className={`cartoon-badge px-2 py-0.5 text-[9px] ${
                           log.level === "ERROR"
-                            ? "bg-rose-500/20 text-rose-400"
+                            ? "bg-rose-300 text-rose-950"
                             : log.level === "WARN"
-                            ? "bg-amber-500/20 text-amber-400"
-                            : "bg-slate-800 text-slate-300"
+                            ? "bg-amber-300 text-amber-950"
+                            : "bg-blue-200 text-blue-950"
                         }`}
                       >
                         {log.level}
                       </span>
                     </td>
-                    <td className="py-3 px-4">
-                      <span className="font-semibold text-indigo-300">{log.source}</span>
+                    <td className="px-4 py-3 font-black text-black">
+                      {log.source}
                     </td>
-                    <td className="py-3 px-4 text-slate-200">
+                    <td className="px-4 py-3 text-black font-bold">
                       <p>{log.message}</p>
                       {log.details && (
-                        <p className="text-[10px] text-slate-500 mt-1 line-clamp-1">
+                        <p className="text-[10px] text-gray-500 font-mono mt-0.5 line-clamp-1">
                           {log.details}
                         </p>
                       )}

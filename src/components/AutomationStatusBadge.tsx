@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Power } from "lucide-react";
 
 export default function AutomationStatusBadge({ initialEnabled }: { initialEnabled: boolean }) {
   const [enabled, setEnabled] = useState(initialEnabled);
@@ -25,33 +26,37 @@ export default function AutomationStatusBadge({ initialEnabled }: { initialEnabl
   }
 
   return (
-    <div className="p-4 border-t border-slate-800/80 bg-slate-950/60">
+    <div className="p-4 border-t-3 border-[#111111] bg-white">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-2.5">
-          <div className="relative flex h-3 w-3">
+          <div className="relative flex h-4 w-4">
             {enabled ? (
               <>
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-[#111111]"></span>
               </>
             ) : (
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-amber-400 border-2 border-[#111111]"></span>
             )}
           </div>
           <div className="text-xs">
-            <p className={`font-semibold ${enabled ? "text-slate-200" : "text-amber-400"}`}>
-              {enabled ? "AUTOMATION ACTIVE" : "AUTOMATION PAUSED"}
+            <p className="font-black text-black">
+              {enabled ? "BOT AKTIF" : "BOT JEDA"}
             </p>
-            <p className="text-slate-400">{enabled ? "Daemon: Standing By" : "All Crons Halted"}</p>
+            <p className="text-[10px] font-bold text-gray-500">
+              {enabled ? "Daemon Standby" : "Jadwal Berhenti"}
+            </p>
           </div>
         </div>
         <button
           onClick={toggle}
           disabled={loading}
-          className="p-1.5 hover:bg-slate-800 rounded-md text-slate-400 transition"
+          className={`cartoon-btn p-2 text-xs flex items-center justify-center ${
+            enabled ? "bg-emerald-300 hover:bg-emerald-400" : "bg-gray-200 hover:bg-gray-300"
+          }`}
           title="Toggle Automation"
         >
-          {loading ? "..." : "⏻"}
+          <Power className="w-4 h-4 stroke-[3]" />
         </button>
       </div>
     </div>
