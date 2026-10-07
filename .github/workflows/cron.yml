@@ -1,0 +1,55 @@
+# Drives the automation engine on a 10-minute cadence.
+#
+# Why GitHub Actions instead of Vercel Cron: the Vercel project runs on the Hobby
+# plan, which only allows cron jobs that fire once per day. GitHub Actions has no
+# such limit for public repositories, so it calls the same endpoints.
+#
+# The schedule is intentionally duplicated from vercel.json: the Vercel entries are
+# a once-daily safety net in case Actions is ever disabled or the repo goes private.
+name: Cron Automation
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # scheduler: publish due posts + recover failed pipelines
+    - cron: '15 */2 * * *'   # analytics: sync Threads insights
+  workflow_dispatch:          # allow manual runs from the Actions tab
+
+# Never let two runs overlap: the engine has its own idempotency locks, but a
+# queue of overlapping runs would waste minutes and hammer the database.
+concurrency:
+  group: cron-automation
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine which endpoint to call
+        id: pick
+        run: |
+          if [ "${{ github.event.schedule }}" = "15 */2 * * *" ]; then
+            echo "path=api/cron/analytics" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=api/cron/scheduler" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Call ${{ steps.pick.outputs.path }}
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ vars.CRON_BASE_URL || 'https://threads-affiliate-engine.vercel.app' }}
+          PATH_TO_HIT: ${{ steps.pick.outputs.path }}
+        run: |
+          set -eu
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET secret is not set on this repository."
+            exit 1
+          fi
+          url="${BASE_URL}/${PATH_TO_HIT}?secret=${CRON_SECRET}"
+          code=$(curl -sS -o /tmp/body.json -w '%{http_code}' --max-time 60 "$url")
+          echo "HTTP $code"
+          cat /tmp/body.json
+          echo
+          if [ "$code" != "200" ]; then
+            echo "::error::Cron endpoint returned HTTP $code"
+            exit 1
+          fi

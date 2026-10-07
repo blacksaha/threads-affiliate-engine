@@ -17,6 +17,7 @@ TUGAS ANDA:
 2. Jika ada teks lain di sekitar link, CARIKAN JUDUL PRODUK & HARGA dari teks tersebut.
    - Format harga biasanya: "Rp 10.000", "Rp10.000", "10rb", "10.000"
    - Judul produk biasanya berada SEBELUM link (1-3 kalimat terakhir sebelum link)
+   - Jika ada URL gambar produk di pesan (biasanya berisi .jpg/.png/.webp), ekstrak juga ke imageUrl. Jika tidak ada, biarkan kosong.
 3. Jika tidak menemukan nama/harga eksplisit, gunakan default:
    - name: "Produk Shopee Promo"
    - price: "Cek Promo"
@@ -51,6 +52,42 @@ function extractJson(text: string): string {
     return cleaned.substring(firstBrace, lastBrace + 1);
   }
   return cleaned;
+}
+
+/**
+ * Regex-only extraction, used when the LLM is unavailable (429/503/outage).
+ *
+ * A Shopee share message is highly regular ("<judul> dengan harga Rp24.800.
+ * Dapatkan di Shopee sekarang! <link>"), so the link, price and title can all
+ * be recovered without an AI call. Without this, a transient Gemini failure
+ * means the product is never created and the user's link is lost for good.
+ */
+function parseShopeeMessageFallback(text: string) {
+  const urlMatch = text.match(/https?:\/\/(?:s\.shopee\.co\.id|shp\.ee)\/[^\s]+/i);
+  const affiliateUrl = urlMatch ? urlMatch[0] : "";
+
+  // "Rp24.800" / "Rp 24.800" / "24.800" / "Rp24,800"
+  const priceMatch = text.match(/rp\s*([\d.,]+)/i) || text.match(/\b(\d{1,3}(?:[.,]\d{3})+)\b/);
+  const price = priceMatch ? priceMatch[1].replace(/[.,]/g, "") : "Cek Promo";
+
+  // Title = the text just before the link, with Shopee boilerplate stripped.
+  let name = "Produk Shopee Promo";
+  const beforeLink = affiliateUrl ? text.split(affiliateUrl)[0] : text;
+  const cleaned = beforeLink
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/cek\s+/i, " ")
+    .replace(/dengan harga[\s\S]*$/i, " ")
+    .replace(/dapatkan di shopee sekarang!?/i, " ")
+    .replace(/rp\s*[\d.,]+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (cleaned.length > 3) {
+    name = cleaned.length > 120 ? cleaned.slice(0, 120).trim() : cleaned;
+  }
+
+  const imageMatch = text.match(/https?:\/\/\S+\.(?:jpg|jpeg|png|webp)(?:\?\S*)?/i);
+
+  return { name, price, affiliateUrl, imageUrl: imageMatch ? imageMatch[0] : "" };
 }
 
 export const maxDuration = 60; // Allow 60s for Telegram webhook + AI Generation
@@ -139,7 +176,9 @@ export async function POST(request: Request) {
 
       try {
         const prompt = EXTRACTOR_PROMPT.replace("{MESSAGE}", text);
-        const extractedText = await callGemini(prompt);
+        // Hard 20s ceiling: the webhook must stay well inside maxDuration=60 and
+        // the regex fallback below is fast and reliable.
+        const extractedText = await callGemini(prompt, { deadlineMs: 20000 });
         const parsed = JSON.parse(extractJson(extractedText));
 
         await sendTelegramMessage(token, chatId, `📦 *Produk Terdeteksi!*\nNama: ${parsed.name}\nHarga: Rp ${parsed.price}\n\n⚙️ Memasukkan ke Pipeline Engine...`);
@@ -171,10 +210,44 @@ export async function POST(request: Request) {
         // Hapus pemanggilan runProductPipeline dari webhook agar webhook merespon sangat cepat (1 detik).
         // Pipeline AI yang berat (Gemini, dll) akan otomatis ditangkap dan dieksekusi oleh Cron Job 10-menit.
         await sendTelegramMessage(token, chatId, `✅ *Produk Masuk Antrean!*\nNama: ${parsed.name}\nHarga: Rp ${parsed.price}\n\nSistem akan merancang utas dan menjadwalkannya secara otomatis dalam beberapa menit ke depan.`);
-        
+
       } catch (err: any) {
-        console.error('[WEBHOOK PIPELINE ERROR]', err);
-        await sendTelegramMessage(token, chatId, `❌ *Terjadi Kesalahan Server:* ${err.message}`);
+        console.error('[WEBHOOK AI ERROR]', err);
+        // Gemini is rate-limited/saturated far too often to accept silently.
+        // Fallback to deterministic extraction so the user's link is never lost.
+        const fallback = parseShopeeMessageFallback(text);
+        if (!fallback.affiliateUrl) {
+          await sendTelegramMessage(token, chatId, `❌ *Terjadi Kesalahan Server:* ${err.message}`);
+          return NextResponse.json({ ok: true, error: err.message });
+        }
+
+        console.warn(`[WEBHOOK] Falling back to regex extraction. Reason: ${err.message}`);
+        await sendTelegramMessage(
+          token,
+          chatId,
+          `⚠️ *AI sibuk sekarang (429).* Saya tetap menyimpan produk ini lewat ekstraksi manual dan akan diproses otomatis.\nNama: ${fallback.name}\nHarga: Rp ${fallback.price}`
+        );
+
+        let finalImageUrl: string | null = fallback.imageUrl || null;
+        if (!finalImageUrl) {
+          try {
+            const scraped = await scrapeShopeePage(fallback.affiliateUrl);
+            finalImageUrl = scraped.imageUrl || null;
+          } catch (e) {
+            console.warn('[WEBHOOK] Fallback image scrape failed:', e);
+          }
+        }
+
+        await prisma.product.create({
+          data: {
+            userId: targetUserId,
+            name: fallback.name,
+            price: String(fallback.price),
+            affiliateUrl: fallback.affiliateUrl,
+            imageUrl: finalImageUrl,
+          }
+        });
+        // Pipeline cron akan menangani generation nanti, seperti produk normal.
       }
     } else {
       await sendTelegramMessage(token, chatId, "Kirimkan link produk Shopee untuk diproses.");

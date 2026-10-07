@@ -12,14 +12,42 @@ function getNextApiKey() {
   return key;
 }
 
-// Fallback models in order of priority (Hanya model valid yang aktif)
+// Fallback models in order of priority.
+// NOTE: keep this list in sync with README/docs. `gemini-flash-latest` is the
+// alias Google keeps pointed at a healthy flash model, so it must stay here as
+// the last-resort entry: when every pinned version is saturated it is usually
+// the only one still serving.
 const CANDIDATE_MODELS = [
   "gemini-3.8-flash",
   "gemini-3.7-flash",
   "gemini-3.6-flash",
   "gemini-3.5-flash",
   "gemini-3.5-flash-lite",
+  "gemini-flash-latest",
 ];
+
+// How many full passes over CANDIDATE_MODELS we make before giving up. A single
+// pass is not enough: 503 means "high demand, try again shortly" and the whole
+// key pool shares the same model capacity, so a burst of Shopee links would
+// otherwise burn every model once and fail instantly.
+const MAX_ROUNDS = 3;
+
+// Backoff between rounds, in ms. Index = round number.
+const ROUND_BACKOFF_MS = [1500, 4000, 8000];
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export interface CallGeminiOptions {
+  /** Overrides the default 40s per-request timeout (ms). */
+  timeoutMs?: number;
+  /**
+   * Total wall-clock budget for the whole call (ms). Defaults to 45s so the
+   * request still fits inside the 60s serverless maxDuration: without a ceiling
+   * the round x model x key loops could run for many minutes and Vercel would
+   * kill the function, losing the request entirely.
+   */
+  deadlineMs?: number;
+}
 
 const HOOK_ARCHETYPES = [
   "Relatable Venting (Curhat masalah harian/anak kost/kantoran yang bikin jengkel secara jujur)",
@@ -70,66 +98,97 @@ function extractJson(text: string): string {
   return cleaned;
 }
 
-export async function callGemini(prompt: string): Promise<string> {
+export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): Promise<string> {
   if (GEMINI_API_KEYS.length === 0) {
     throw new Error("GEMINI_API_KEY is not configured.");
   }
 
+  const timeoutMs = opts.timeoutMs ?? 40000;
+  const deadlineMs = opts.deadlineMs ?? 45000;
+  const startedAt = Date.now();
   let lastError: unknown = null;
 
-  for (const model of CANDIDATE_MODELS) {
-    // Coba SEMUA API Key yang tersedia (rotasi penuh) sebelum berpindah model
-    for (let keyAttempt = 0; keyAttempt < GEMINI_API_KEYS.length; keyAttempt++) {
-      const apiKey = getNextApiKey();
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 40000);
+  // Outer loop = rounds. Inner loops = every model x every key, so a transient
+  // 503/429 on one key never costs us the whole request.
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    // Stop before the serverless function is killed mid-request.
+    if (Date.now() - startedAt >= deadlineMs) {
+      console.warn(`[GEMINI] Deadline of ${deadlineMs}ms reached before round ${round + 1}.`);
+      break;
+    }
 
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    if (round > 0) {
+      const wait = ROUND_BACKOFF_MS[Math.min(round - 1, ROUND_BACKOFF_MS.length - 1)];
+      if (Date.now() - startedAt + wait >= deadlineMs) break;
+      console.warn(`[GEMINI] Round ${round + 1}/${MAX_ROUNDS} after ${wait}ms backoff. Last error: ${String(lastError)}`);
+      await sleep(wait);
+    }
 
-        const response = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-          }),
-          signal: controller.signal,
-        });
+    for (const model of CANDIDATE_MODELS) {
+      // Try EVERY available API key before moving to the next model.
+      for (let keyAttempt = 0; keyAttempt < GEMINI_API_KEYS.length; keyAttempt++) {
+        if (Date.now() - startedAt >= deadlineMs) break;
 
-        if (response.status === 503) {
-          console.warn(`[GEMINI] Model ${model} is experiencing high demand (503). Trying fallback model...`);
-          lastError = "Server overloaded (503)";
-          break; // Break the key attempt loop, try next model
-        }
+        const apiKey = getNextApiKey();
+        const controller = new AbortController();
+        // Never let one request outlive the remaining budget.
+        const remaining = deadlineMs - (Date.now() - startedAt);
+        const timeoutId = setTimeout(() => controller.abort(), Math.max(1000, Math.min(timeoutMs, remaining)));
 
-        if (response.status === 429 || response.status === 403 || response.status === 400) {
-          console.warn(`[GEMINI] Model ${model} returned ${response.status} on key. Rotating to next API Key...`);
-          lastError = `Status ${response.status} on key - Switching Key`;
-          continue; // Langsung coba key berikutnya!
-        }
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.warn(`[GEMINI] Model ${model} returned error ${response.status}: ${errorText}`);
-          lastError = `HTTP ${response.status} - ${errorText.substring(0, 100)}`;
-          break; // Break the key attempt loop, try next model
-        }
+          const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+            }),
+            signal: controller.signal,
+          });
 
-        const data = await response.json();
-        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        if (rawText.trim()) {
+          // 503 = model capacity, not our key's fault. Rotate the key first;
+          // the round backoff above is what actually gives it time to recover.
+          if (response.status === 503) {
+            console.warn(`[GEMINI] Model ${model} overloaded (503). Rotating key...`);
+            lastError = "Server overloaded (503)";
+            continue;
+          }
+
+          // 429 = this key is rate limited. 403/400 = this key is unusable
+          // (denied project / bad request) so there is no point retrying it.
+          if (response.status === 429 || response.status === 403 || response.status === 400) {
+            console.warn(`[GEMINI] Model ${model} returned ${response.status} on key. Rotating to next API Key...`);
+            lastError = `Status ${response.status} on key - Switching Key`;
+            continue;
+          }
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.warn(`[GEMINI] Model ${model} returned error ${response.status}: ${errorText}`);
+            lastError = `HTTP ${response.status} - ${errorText.substring(0, 100)}`;
+            continue;
+          }
+
+          const data = await response.json();
+          const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          if (rawText.trim()) {
+            clearTimeout(timeoutId);
+            return rawText.trim();
+          }
+
+          // 200 with no usable text (safety block / empty candidate): treat as a
+          // failed attempt for this key rather than silently returning "".
+          lastError = "Empty response from model";
+        } catch (err: unknown) {
+          const isAbort = err instanceof Error && err.name === "AbortError";
+          console.warn(`[GEMINI] Attempt with model ${model} failed${isAbort ? " (timeout)" : ""}:`, err);
+          lastError = err;
+          // Short pause so a flaky network call does not hammer the endpoint.
+          await sleep(500);
+        } finally {
           clearTimeout(timeoutId);
-          return rawText.trim();
         }
-      } catch (err: unknown) {
-        const isAbort = err instanceof Error && err.name === "AbortError";
-        console.warn(`[GEMINI] Attempt with model ${model} failed${isAbort ? " (timeout)" : ""}:`, err);
-        lastError = err;
-        // Jeda sangat singkat jika error network
-        await new Promise((r) => setTimeout(r, 1000));
-        break; // Break key loop, try next model
-      } finally {
-        clearTimeout(timeoutId);
       }
     }
   }
@@ -327,8 +386,16 @@ Format output HANYA JSON object murni:
 /**
  * 3. Anti-Repetition Check (Similarity compare)
  * Menggunakan perbandingan kata/token instan (0ms) untuk mencegah timeout Vercel
+ *
+ * `threshold` comes from AutomationSettings.similarityThreshold (0.7 by default).
+ * It used to be hardcoded at 0.65, which made the setting in the UI a no-op and
+ * rejected hooks the user had explicitly configured as acceptable.
  */
-export async function checkAntiRepetition(newHook: string, previousHooks: string[]): Promise<ValidationResult> {
+export async function checkAntiRepetition(
+  newHook: string,
+  previousHooks: string[],
+  threshold = 0.65
+): Promise<ValidationResult> {
   if (previousHooks.length === 0) {
     return { pass: true, score: 0.0 };
   }
@@ -346,8 +413,7 @@ export async function checkAntiRepetition(newHook: string, previousHooks: string
     if (sim > maxSim) maxSim = sim;
   }
 
-  // Jika overlap kata lebih dari 65%, anggap terlalu mirip
-  const isTooSimilar = maxSim > 0.65;
+  const isTooSimilar = maxSim > threshold;
   return {
     pass: !isTooSimilar,
     score: parseFloat(maxSim.toFixed(2)),

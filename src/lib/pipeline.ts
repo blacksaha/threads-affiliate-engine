@@ -98,6 +98,7 @@ export async function runProductPipeline(productId: string, userId = 'default_us
 
   let attempt = 0;
   const maxAttempts = settings.maxRegenerationAttempts || 3;
+  const similarityThreshold = settings.similarityThreshold ?? 0.65;
   let draft: ThreadPostDraft | null = null;
   let repetitionPass = false;
   let qualityPass = false;
@@ -129,7 +130,7 @@ export async function runProductPipeline(productId: string, userId = 'default_us
       }
 
       // 2. Anti-Repetition Check
-      const repCheck = await checkAntiRepetition(draft.hook, previousHooks);
+      const repCheck = await checkAntiRepetition(draft.hook, previousHooks, similarityThreshold);
       similarityScore = repCheck.score;
       repetitionPass = repCheck.pass;
 
