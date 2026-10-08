@@ -42,6 +42,7 @@ export default async function DashboardPage() {
   const settings = await prisma.automationSettings.findUnique({
     where: { userId },
   });
+  const timezone = settings?.timezone || "Asia/Makassar";
 
   return (
     <div className="space-y-6 pb-20">
@@ -110,11 +111,11 @@ export default async function DashboardPage() {
             <p className="text-xs font-black text-black">JADWAL NEXT</p>
           </div>
           <div>
-            <p className="text-lg font-black text-black truncate">
-              {nextPost?.scheduledAt ? new Date(nextPost.scheduledAt).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : "KOSONG"}
+            <p className="text-3xl font-black text-black">
+              {nextPost?.scheduledAt ? new Date(nextPost.scheduledAt).toLocaleTimeString("id-ID", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }) : "KOSONG"}
             </p>
-            <p className="text-[10px] font-bold text-gray-700">
-              {nextPost?.scheduledAt ? new Date(nextPost.scheduledAt).toLocaleDateString("id-ID") : "Menunggu produk"}
+            <p className="text-xs font-bold text-gray-700">
+              {nextPost?.scheduledAt ? new Date(nextPost.scheduledAt).toLocaleDateString("id-ID", { timeZone: timezone }) : "Menunggu produk"}
             </p>
           </div>
         </div>
@@ -148,7 +149,7 @@ export default async function DashboardPage() {
                   <div key={log.id} className="text-xs font-bold border-b-2 border-gray-100 pb-2 last:border-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 border border-gray-400">
-                        {new Date(log.createdAt).toLocaleTimeString("id-ID")}
+                        {new Date(log.createdAt).toLocaleTimeString("id-ID", { timeZone: timezone })}
                       </span>
                       <span className={`text-[9px] px-1.5 py-0.5 rounded border ${
                         log.level === "ERROR" ? "bg-rose-100 text-rose-700 border-rose-300" : "bg-blue-100 text-blue-700 border-blue-300"
@@ -217,6 +218,7 @@ export default async function DashboardPage() {
                       <p className="text-xs font-black text-black">
                         {post.scheduledAt
                           ? new Date(post.scheduledAt).toLocaleString("id-ID", {
+                              timeZone: timezone,
                               day: "numeric",
                               month: "short",
                               hour: "2-digit",

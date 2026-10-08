@@ -12,6 +12,9 @@ export default async function LogsPage() {
   const userId = session.user.id;
   const isAdmin = (session.user as any).role === "ADMIN";
 
+  const settings = await prisma.automationSettings.findUnique({ where: { userId } });
+  const timezone = settings?.timezone || "Asia/Makassar";
+
   const logs = await prisma.systemLog.findMany({
     where: isAdmin ? {} : { userId },
     take: 100,
@@ -46,6 +49,7 @@ export default async function LogsPage() {
                   <tr key={log.id} className="hover:bg-amber-50 transition">
                     <td className="px-4 py-3 whitespace-nowrap font-bold text-gray-600">
                       {new Date(log.createdAt).toLocaleString("id-ID", {
+                        timeZone: timezone,
                         month: "short",
                         day: "2-digit",
                         hour: "2-digit",
