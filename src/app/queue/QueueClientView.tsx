@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Zap, Trash2, RotateCw, Eye, EyeOff, XCircle } from "lucide-react";
+import { Zap, Trash2, RotateCw, Eye, EyeOff, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { useUI } from "@/components/ui/ModalProvider";
 
 type Post = {
@@ -36,8 +36,19 @@ const statusBadges: Record<string, string> = {
 export default function QueueClientView({ initialPosts }: { initialPosts: Post[] }) {
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const router = useRouter();
   const { toast, confirm } = useUI();
+
+  const postsPerPage = 10;
+  const totalPages = Math.max(1, Math.ceil(posts.length / postsPerPage));
+  const startIndex = (currentPage - 1) * postsPerPage;
+  const visiblePosts = posts.slice(startIndex, startIndex + postsPerPage);
+
+  // If we delete the last item on a page, handle going back a page
+  if (currentPage > totalPages) {
+    setCurrentPage(totalPages);
+  }
 
   async function handleAction(postId: string, action: string) {
     if (action === "delete") {
@@ -99,9 +110,10 @@ export default function QueueClientView({ initialPosts }: { initialPosts: Post[]
           <p className="font-bold text-gray-700">Antrean konten masih kosong.</p>
         </div>
       ) : (
-        posts.map((post) => {
-          const isExpanded = expandedId === post.id;
-          let chain: string[] = [];
+        <>
+          {visiblePosts.map((post) => {
+            const isExpanded = expandedId === post.id;
+            let chain: string[] = [];
           try {
             chain = JSON.parse(post.content || "[]");
           } catch {
@@ -242,7 +254,59 @@ export default function QueueClientView({ initialPosts }: { initialPosts: Post[]
               )}
             </div>
           );
-        })
+        })}
+        </>
+      )}
+
+      {/* PAGINATION */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 pt-4 pb-8 flex-wrap">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className={`cartoon-btn px-4 py-2 flex items-center gap-1 text-xs font-black border-[3px] border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] uppercase ${
+              currentPage === 1 ? "bg-gray-200 text-gray-400 cursor-not-allowed opacity-60" : "bg-white hover:bg-gray-100 text-black"
+            }`}
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Sebelumnya
+          </button>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+              if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
+                return (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`px-3 py-1.5 text-xs font-black border-[3px] border-black rounded-lg shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] uppercase transition-all ${
+                      currentPage === page
+                        ? "bg-[#ffb347] text-black scale-105"
+                        : "bg-white text-black hover:bg-gray-50"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                );
+              }
+              if (page === currentPage - 2 || page === currentPage + 2) {
+                return <span key={page} className="text-xs font-black text-black px-1">...</span>;
+              }
+              return null;
+            })}
+          </div>
+
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className={`cartoon-btn px-4 py-2 flex items-center gap-1 text-xs font-black border-[3px] border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] uppercase ${
+              currentPage === totalPages ? "bg-gray-200 text-gray-400 cursor-not-allowed opacity-60" : "bg-white hover:bg-gray-100 text-black"
+            }`}
+          >
+            Selanjutnya
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       )}
     </div>
   );
