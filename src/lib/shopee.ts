@@ -8,6 +8,7 @@ export interface ShopeeScrapeResult {
   name?: string;
   price?: string;
   imageUrl?: string;
+  platform?: "SHOPEE" | "TIKTOK" | "TOKOPEDIA" | "UNKNOWN";
 }
 
 function formatPrice(value: number | string | undefined): string {
@@ -89,6 +90,7 @@ export async function scrapeShopeePage(url: string): Promise<ShopeeScrapeResult>
           name: item.name || item.item_name || ogTitle.replace(/^Jual\s+/i, "").trim(),
           price: formatPrice(rawPrice || item.price_min || item.price),
           imageUrl: imageUrl || ogImage,
+          platform: "SHOPEE",
         };
       }
     }
@@ -98,12 +100,94 @@ export async function scrapeShopeePage(url: string): Promise<ShopeeScrapeResult>
       return {
         name: ogTitle.replace(/^Jual\s+/i, "").trim(),
         imageUrl: ogImage,
+        platform: "SHOPEE",
       };
     }
 
-    return {};
+    return { platform: "SHOPEE" };
   } catch (err) {
     console.warn("[SCRAPE] Failed to fetch Shopee page:", err);
-    return {};
+    return { platform: "SHOPEE" };
   }
+}
+
+/**
+ * Scrapes metadata from TikTok Shop product / showcase links.
+ * Supports: vt.tiktok.com, shop.tiktok.com, tiktok.com/@user/live, etc.
+ */
+export async function scrapeTikTokShop(url: string): Promise<ShopeeScrapeResult> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+      },
+      redirect: "follow",
+    });
+
+    const finalUrl = res.url || url;
+    const html = await res.text();
+    
+    let name = "";
+    let imageUrl = "";
+    let price = "";
+
+    // 1. Try Open Graph tags
+    const ogTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+    const ogImage = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+    const ogDesc = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i);
+
+    if (ogTitle?.[1]) {
+      name = ogTitle[1].replace(/\|\s*TikTok(\s*Shop)?/i, "").trim();
+    }
+    if (ogImage?.[1]) {
+      imageUrl = ogImage[1];
+    }
+
+    // 2. Try JSON-LD schema if present
+    const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+    if (jsonLdMatch?.[1]) {
+      try {
+        const parsedLd = JSON.parse(jsonLdMatch[1]);
+        if (parsedLd.name && !name) name = parsedLd.name;
+        if (parsedLd.image && !imageUrl) {
+          imageUrl = Array.isArray(parsedLd.image) ? parsedLd.image[0] : parsedLd.image;
+        }
+        if (parsedLd.offers?.price) {
+          price = formatPrice(parsedLd.offers.price);
+        }
+      } catch {
+        // ignore json parse error
+      }
+    }
+
+    // 3. Fallback: Search for price pattern in HTML or Description (e.g. Rp 45.000)
+    if (!price && ogDesc?.[1]) {
+      const priceMatch = ogDesc[1].match(/(?:Rp|IDR)\s*([\d.,]+)/i);
+      if (priceMatch?.[1]) {
+        price = priceMatch[1].trim();
+      }
+    }
+
+    return {
+      name: name || "Produk TikTok Shop",
+      price: price || "",
+      imageUrl: imageUrl || undefined,
+      platform: "TIKTOK",
+    };
+  } catch (err: any) {
+    console.warn("[TIKTOK SCRAPER] Error scraping TikTok Shop link:", err.message);
+    return { platform: "TIKTOK" };
+  }
+}
+
+/**
+ * Universal Marketplace Scraper router (detects Shopee vs TikTok Shop).
+ */
+export async function scrapeMarketplaceProduct(url: string): Promise<ShopeeScrapeResult> {
+  if (/tiktok\.com/i.test(url)) {
+    return scrapeTikTokShop(url);
+  }
+  return scrapeShopeePage(url);
 }

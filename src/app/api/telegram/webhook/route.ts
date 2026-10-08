@@ -3,45 +3,35 @@ import { prisma } from '@/lib/prisma';
 import { runProductPipeline } from '@/lib/pipeline';
 import { callGemini } from '@/lib/gemini';
 import { sendTelegramMessage } from '@/lib/telegram';
-import { scrapeShopeePage } from '@/lib/shopee';
+import { scrapeMarketplaceProduct } from '@/lib/shopee';
 
-const EXTRACTOR_PROMPT = `
-Anda adalah AI asisten bot yang cerdas dalam mengekstrak data produk Shopee dari pesan pengguna.
-PESUNG BISA BERISI:
-1. HANYA LINK (contoh: https://s.shopee.co.id/xxx)
-2. TEKS LENGKAP DARI SHOPEE SHARE MESSAGE (judul produk, harga, dll + link)
-3. CAMPAURAN Teks deskripsi + link
+const EXTRACTOR_PROMPT = `Anda adalah AI asisten bot yang cerdas dalam mengekstrak data produk affiliate (Shopee, TikTok Shop, Tokopedia) dari pesan pengguna.
+PESAN BISA BERISI:
+1. HANYA LINK (contoh: https://s.shopee.co.id/xxx, https://vt.tiktok.com/xxx)
+2. TEKS LENGKAP SHARE MESSAGE (judul produk, harga, dll + link)
+3. CAMPURAN Teks deskripsi + link
 
 TUGAS ANDA:
-1. Cari SEMUA URL yang mengandung "shopee.co.id" atau "shp.ee" di pesan.
+1. Cari SEMUA URL yang valid di pesan (shopee, tiktok, tokopedia).
 2. Jika ada teks lain di sekitar link, CARIKAN JUDUL PRODUK & HARGA dari teks tersebut.
    - Format harga biasanya: "Rp 10.000", "Rp10.000", "10rb", "10.000"
-   - Judul produk biasanya berada SEBELUM link (1-3 kalimat terakhir sebelum link)
-   - Jika ada URL gambar produk di pesan (biasanya berisi .jpg/.png/.webp), ekstrak juga ke imageUrl. Jika tidak ada, biarkan kosong.
+   - Judul produk biasanya berada SEBELUM link
+   - Jika ada URL gambar produk di pesan, ekstrak ke imageUrl. Jika tidak ada, biarkan kosong.
 3. Jika tidak menemukan nama/harga eksplisit, gunakan default:
-   - name: "Produk Shopee Promo"
+   - name: "Produk Promo Rekomendasi"
    - price: "Cek Promo"
 4. Output HANYA dalam format JSON murni tanpa komentar tambahan.
-
-Contoh Pesan dari Shopee Share Message:
-"Cek ANGOLA Sikat Dorong Lantai D46 Alat Sikat Toilet Sikat Kamar Mandi Gagang Panjang 2IN1 dengan harga Rp24.800. Dapatkan di Shopee sekarang! https://s.shopee.co.id/3g3uO2XKGy?share_channel_code=2"
-
-Dari contoh di atas, Anda harus ekstrak:
-- name: "ANGOLA Sikat Dorong Lantai D46"
-- price: "24.800"  
-- affiliateUrl: "https://s.shopee.co.id/3g3uO2XKGy?share_channel_code=2"
 
 Output JSON:
 {
   "name": "Nama Produk Lengkap",
   "price": "100.000",
-  "affiliateUrl": "https://s.shopee.co.id/xxx",
-  "imageUrl": ""
+  "affiliateUrl": "https://link.afiliasi.com/xxx",
+  "imageUrl": "https://image.url/xxx" // kosongkan jika tidak ada URL gambar langsung
 }
 
 Pesan Pengguna Saat Ini:
-"{MESSAGE}"
-`;
+"{MESSAGE}"`;
 
 function extractJson(text: string): string {
   let cleaned = text.trim();
@@ -140,7 +130,7 @@ export async function POST(request: Request) {
     }
 
     if (text === '/start') {
-      const reply = "👋 *Halo Master!*\n\nBot Affiliate Content Engine siap bertugas.\n\nKirimkan share link dari Shopee app ke sini (lengkap dengan teksnya atau link saja), dan saya akan mengurus sisanya!\n\nPerintah tersedia:\n`/status` - Cek status engine\n`/queue` - Cek antrean postingan terdekat\n`/pause` - Hentikan automasi publish\n`/resume` - Aktifkan automasi publish";
+      const reply = "👋 *Halo Master!*\n\nBot Affiliate Content Engine siap bertugas.\n\nKirimkan link produk dari Shopee atau TikTok Shop (lengkap dengan teksnya atau link saja), dan saya akan otomatis menyusun utas kontennya!\n\nPerintah tersedia:\n`/status` - Cek status engine\n`/queue` - Cek antrean postingan terdekat\n`/pause` - Hentikan automasi publish\n`/resume` - Aktifkan automasi publish";
       await sendTelegramMessage(token, chatId, reply);
       return NextResponse.json({ ok: true });
     }
@@ -185,8 +175,8 @@ export async function POST(request: Request) {
 
     if (text.includes("shopee.co.id") || text.includes("shp.ee") || text.includes("tokopedia.com") || text.includes("tiktok.com")) {
       // DEDUPLIKASI: Cek apakah link ini sudah pernah dikirim dalam 15 menit terakhir
-      // Menggunakan regex untuk mencari link shopee di dalam teks
-      const urlMatch = text.match(/https?:\/\/(?:s\.shopee\.co\.id|shp\.ee)\/[^\s]+/i);
+      const urlMatch = text.match(/https?:\/\/(?:s\.shopee\.co\.id|shp\.ee|vt\.tiktok\.com|shop\.tiktok\.com|www\.tiktok\.com|tokopedia\.com)[^\s]+/i);
+      
       if (urlMatch) {
         const urlToMatch = urlMatch[0];
         // Kita cari product dengan affiliateUrl yang mengandung ID pendek link tersebut,
@@ -231,17 +221,23 @@ export async function POST(request: Request) {
 
         await sendTelegramMessage(token, chatId, `📦 *Produk Terdeteksi!*\nNama: ${parsed.name}\nHarga: Rp ${parsed.price}\n\n⚙️ Memasukkan ke Pipeline Engine...`);
 
-        // Ambil gambar produk langsung dari halaman Shopee agar postingan FB punya foto
+        // Ambil gambar produk langsung dari Shopee / TikTok Shop
         let finalImageUrl: string | null = parsed.imageUrl || null;
         if (!finalImageUrl && parsed.affiliateUrl) {
           try {
-            const scraped = await scrapeShopeePage(parsed.affiliateUrl);
+            const scraped = await scrapeMarketplaceProduct(parsed.affiliateUrl);
             if (scraped.imageUrl) {
               finalImageUrl = scraped.imageUrl;
               console.log(`[WEBHOOK] Image URL found: ${finalImageUrl}`);
             }
+            if (!parsed.name || parsed.name === "Produk Shopee Promo" || parsed.name.includes("Promo")) {
+              if (scraped.name) parsed.name = scraped.name;
+            }
+            if (!parsed.price && scraped.price) {
+              parsed.price = scraped.price;
+            }
           } catch (e) {
-            console.warn('[WEBHOOK] Image scrape failed:', e);
+            console.warn('[WEBHOOK] Marketplace scrape failed:', e);
           }
         }
 
@@ -279,8 +275,10 @@ export async function POST(request: Request) {
         let finalImageUrl: string | null = fallback.imageUrl || null;
         if (!finalImageUrl) {
           try {
-            const scraped = await scrapeShopeePage(fallback.affiliateUrl);
+            const scraped = await scrapeMarketplaceProduct(fallback.affiliateUrl);
             finalImageUrl = scraped.imageUrl || null;
+            if (scraped.name && (!fallback.name || fallback.name.includes("Promo"))) fallback.name = scraped.name;
+            if (scraped.price && !fallback.price) fallback.price = scraped.price;
           } catch (e) {
             console.warn('[WEBHOOK] Fallback image scrape failed:', e);
           }
@@ -298,7 +296,7 @@ export async function POST(request: Request) {
         // Pipeline cron akan menangani generation nanti, seperti produk normal.
       }
     } else {
-      await sendTelegramMessage(token, chatId, "Kirimkan link produk Shopee untuk diproses.");
+      await sendTelegramMessage(token, chatId, "Kirimkan link produk Shopee atau TikTok Shop untuk diproses.");
     }
 
     // Response cepat ke Telegram

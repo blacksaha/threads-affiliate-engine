@@ -44,8 +44,8 @@ export async function POST(request: Request) {
   // Fallback: scrape image if not provided
   let finalImageUrl = imageUrl || null;
   if (!finalImageUrl && affiliateUrl) {
-    const { scrapeShopeePage } = await import('@/lib/shopee');
-    const scraped = await scrapeShopeePage(affiliateUrl);
+    const { scrapeMarketplaceProduct } = await import('@/lib/shopee');
+    const scraped = await scrapeMarketplaceProduct(affiliateUrl);
     if (scraped.imageUrl) {
       finalImageUrl = scraped.imageUrl;
       console.log(`[PRODUCTS API] Image URL found: ${finalImageUrl}`);

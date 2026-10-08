@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
-import { scrapeShopeePage } from '@/lib/shopee';
+import { scrapeMarketplaceProduct } from '@/lib/shopee';
 
 export async function POST(request: Request) {
   try {
     const { url } = await request.json();
-    if (!url || !url.includes('shopee.co.id')) {
-      return NextResponse.json({ success: false, error: 'URL Shopee tidak valid.' }, { status: 400 });
+    if (!url) {
+      return NextResponse.json({ success: false, error: 'URL tidak valid.' }, { status: 400 });
     }
 
-    const scraped = await scrapeShopeePage(url);
+    const scraped = await scrapeMarketplaceProduct(url);
 
     return NextResponse.json({
       success: true,
