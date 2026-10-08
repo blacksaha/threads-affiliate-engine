@@ -94,9 +94,14 @@ export async function POST(request: Request) {
     // Dukung pesan teks maupun caption (jika share foto dari Shopee)
     const text = (msg.text || msg.caption || "").trim();
     const photos = msg.photo;
-
-    // Dukung pesan teks maupun caption (jika share foto dari Shopee)
-    if (!text && (!photos || photos.length === 0)) return NextResponse.json({ ok: true });
+    
+    const chatId = String(msg.chat.id);
+    
+    // Jika ada gambar/ foto yang dikirim user (contoh: share Shopee langsung ke Telegram), simpan URL-nya
+    let uploadedTelegramImageUrl: string | null = null;
+    if (photos && photos.length > 0) {
+      console.log(`[WEBHOOK] Received ${photos.length} photo(s) from Chat ID: ${chatId}`);
+    }
 
     // Find user by userId in query OR by telegramChatId
     let settings = null;
@@ -122,7 +127,6 @@ export async function POST(request: Request) {
     const token = settings.telegramBotToken;
     const targetUserId = settings.userId;
 
-    let uploadedTelegramImageUrl: string | null = null;
     // Jika user mengirimkan pesan beserta FOTO (contoh: share dari aplikasi Shopee langsung ke Telegram)
     if (photos && photos.length > 0) {
       try {
