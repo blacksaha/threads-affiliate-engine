@@ -211,6 +211,7 @@ export async function POST(request: Request) {
           provider: settings?.aiProvider || "GEMINI",
           apiKey: settings?.aiApiKey || null,
           baseUrl: settings?.aiBaseUrl || null,
+          modelName: settings?.aiModel || null,
         };
 
         const prompt = EXTRACTOR_PROMPT.replace("{MESSAGE}", text);

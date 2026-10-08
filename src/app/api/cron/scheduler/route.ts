@@ -205,6 +205,7 @@ export async function GET(request: Request) {
             { posts: { some: { status: 'FAILED' }, none: { status: { in: ['PUBLISHED', 'SCHEDULED', 'READY'] } } } }
           ]
         },
+        orderBy: { createdAt: 'desc' },
         take: 2 // Max 2 per cycle
       });
 

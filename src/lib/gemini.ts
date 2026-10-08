@@ -50,8 +50,10 @@ export interface CallGeminiOptions {
   provider?: string;
   apiKey?: string | null;
   baseUrl?: string | null;
+  modelName?: string | null;
   deepseekApiKey?: string | null;
   deepseekBaseUrl?: string | null;
+  deepseekModelName?: string | null;
 }
 
 const HOOK_ARCHETYPES = [
@@ -103,9 +105,10 @@ function extractJson(text: string): string {
   return cleaned;
 }
 
-async function executeDeepSeek(prompt: string, apiKey: string, baseUrl?: string | null, timeoutMs = 40000): Promise<string> {
+async function executeDeepSeek(prompt: string, apiKey: string, baseUrl?: string | null, modelName?: string | null, timeoutMs = 40000): Promise<string> {
   let base = (baseUrl || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").trim().replace(/\/+$/, "");
   const endpoint = base.endsWith("/chat/completions") ? base : `${base}/chat/completions`;
+  const selectedModel = (modelName || process.env.DEEPSEEK_MODEL || "deepseek-chat").trim();
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -117,7 +120,7 @@ async function executeDeepSeek(prompt: string, apiKey: string, baseUrl?: string 
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "deepseek-chat",
+        model: selectedModel,
         messages: [
           { role: "system", content: "You are a professional Indonesian content creator and copywriter." },
           { role: "user", content: prompt },
@@ -144,7 +147,7 @@ export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): 
 
   if (isDeepSeek) {
     if (!dsKey) throw new Error("DeepSeek API Key is not configured.");
-    return executeDeepSeek(prompt, dsKey, opts.baseUrl || opts.deepseekBaseUrl, opts.timeoutMs);
+    return executeDeepSeek(prompt, dsKey, opts.baseUrl || opts.deepseekBaseUrl, opts.modelName || opts.deepseekModelName, opts.timeoutMs);
   }
 
   // If user provided custom Google Gemini API Key

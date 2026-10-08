@@ -164,19 +164,33 @@ export default function SettingsClientForm({ initialSettings }: { initialSetting
           </div>
 
           {settings.aiProvider === "DEEPSEEK" && (
-            <div className="md:col-span-2">
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
-                Custom Base URL / Proxy Server (Opsional)
-              </label>
-              <input
-                type="text"
-                value={settings.aiBaseUrl || ""}
-                onChange={(e) => setSettings((s) => ({ ...s, aiBaseUrl: e.target.value }))}
-                placeholder="https://api.deepseek.com atau https://api.proxyanda.com/v1"
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
-              />
-              <p className="text-[11px] text-slate-400 mt-1">
-                Kosongkan untuk default resmi (https://api.deepseek.com). Mendukung proxy OpenAI-compatible seperti OpenRouter, One API, Cloudflare dsb.
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Custom Base URL / Proxy Server (Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={settings.aiBaseUrl || ""}
+                  onChange={(e) => setSettings((s) => ({ ...s, aiBaseUrl: e.target.value }))}
+                  placeholder="https://api.deepseek.com"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  Model Name (Opsional)
+                </label>
+                <input
+                  type="text"
+                  value={settings.aiModel || ""}
+                  onChange={(e) => setSettings((s) => ({ ...s, aiModel: e.target.value }))}
+                  placeholder="deepseek-chat"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
+                />
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1 md:col-span-2">
+                Kosongkan URL untuk default resmi (https://api.deepseek.com). Kosongkan Model Name untuk memakai "deepseek-chat". Jika memakai proxy/aggregator, isi nama model spesifik (contoh: <code>deepseek-v4.1-flash</code>, <code>claude-3-5-sonnet</code>).
               </p>
             </div>
           )}
