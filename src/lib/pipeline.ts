@@ -66,7 +66,7 @@ export async function runProductPipeline(productId: string, userId = 'default_us
 
   const aiConfig = {
     provider: settings.aiProvider || "GEMINI",
-    apiKey: *** || null,
+    apiKey: settings.aiApiKey || null,
     baseUrl: settings.aiBaseUrl || null,
     modelName: settings.aiModel || null,
   };
