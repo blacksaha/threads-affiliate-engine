@@ -15,21 +15,34 @@ export default function ProductIngestForm() {
   const [submitting, setSubmitting] = useState(false);
 
   const handleScrape = async () => {
-    if (!url.includes("shopee.co.id") && !url.includes("shp.ee")) {
-      alert("Masukkan link Shopee yang valid!");
+    const urlMatch = url.match(/https?:\/\/[^\s]+/i);
+    const extractedUrl = urlMatch ? urlMatch[0] : url.trim();
+
+    if (!extractedUrl.includes("shopee.co.id") && !extractedUrl.includes("shp.ee") && !extractedUrl.includes("tiktok.com") && !extractedUrl.includes("tokopedia.com")) {
+      alert("Masukkan link marketplace yang valid (Shopee/TikTok/Tokopedia)!");
       return;
     }
+    
+    // Auto-extract price if user pasted full share text
+    const priceMatch = url.match(/rp\s*([\d.,]+)/i) || url.match(/seharga\s*rp?\s*([\d.,]+)/i);
+    let extractedPrice = price;
+    if (priceMatch && !price) {
+      extractedPrice = priceMatch[1].replace(/[.,]/g, "");
+      setPrice(extractedPrice);
+    }
+    
+    setUrl(extractedUrl);
     setLoading(true);
     try {
       const res = await fetch("/api/products/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url })
+        body: JSON.stringify({ url: extractedUrl })
       });
       const json = await res.json();
       if (json.success) {
         setName(json.data.name || "");
-        setPrice(json.data.price || "");
+        if (!extractedPrice || extractedPrice === "Cek Promo") setPrice(json.data.price || "Cek Promo");
         setImageUrl(json.data.imageUrl || "");
       } else {
         alert(json.error || "Gagal scrape produk");

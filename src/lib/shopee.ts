@@ -37,8 +37,12 @@ function extractIdsFromRedirectUrl(url: string): { shopId?: string; itemId?: str
 }
 
 export async function scrapeShopeePage(url: string): Promise<ShopeeScrapeResult> {
+  const startTime = Date.now();
+
   try {
-    // Step 1: Resolve short link to full product URL and extract og:image in case API fails.
+    console.log(`[SHOPEE SCRAPER] Starting to resolve: ${url}...`);
+
+    // Step 1: Follow redirects AND extract OG tags from the FINAL page (as backup)
     const headRes = await fetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
@@ -46,10 +50,14 @@ export async function scrapeShopeePage(url: string): Promise<ShopeeScrapeResult>
         "Accept-Language": "id-ID,id;q=0.9",
       },
       redirect: "follow",
+      signal: AbortSignal.timeout(8000), // Max 8s for redirect resolution
     });
 
     const finalUrl = headRes.url || url;
     const html = await headRes.text();
+    
+    const elapsed = Date.now() - startTime;
+    console.log(`[SHOPEE SCRAPER] Redirect followed in ${elapsed}ms. Final URL: ${finalUrl}`);
 
     let ogTitle = "";
     let ogImage = "";
@@ -60,55 +68,79 @@ export async function scrapeShopeePage(url: string): Promise<ShopeeScrapeResult>
       ogImage = ogImageMatch ? ogImageMatch[1] : "";
     }
 
-    // Step 2: Try public Shopee API to get accurate name/price/image.
+    // Step 2: Extract shopId & itemId from the FINAL resolved URL (NOT short one)
     const ids = extractIdsFromRedirectUrl(finalUrl);
+    
+    // Step 3: Fetch the Canonical Product page using Facebook Crawler UA
+    // Shopee ALWAYS renders rich OpenGraph tags (real product photo & title) for social crawlers!
     if (ids?.itemId && ids.shopId) {
-      const apiUrl = `https://shopee.co.id/api/v4/item/get?itemid=${ids.itemId}&shopid=${ids.shopId}`;
-      const apiRes = await fetch(apiUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-          "Accept": "application/json",
-          "Referer": `https://shopee.co.id/product-${ids.shopId}-${ids.itemId}`,
-          "X-Requested-With": "XMLHttpRequest",
-        },
-      });
-      const data = await apiRes.json();
-      if (data?.data) {
-        const item = data.data;
-        // image field can be a hash or direct CDN path
-        const imgHash = item.image || item.item_image || (item.images && item.images[0]);
-        let imageUrl: string | undefined;
-        if (imgHash) {
-          imageUrl = imgHash.startsWith("http") ? imgHash : `https://cf.shopee.co.id/file/${imgHash}`;
+      console.log(`[SHOPEE SCRAPER] Extracted ShopID=${ids.shopId}, ItemID=${ids.itemId}`);
+      const canonicalUrl = `https://shopee.co.id/product/${ids.shopId}/${ids.itemId}`;
+      
+      try {
+        const socialRes = await fetch(canonicalUrl, {
+          headers: {
+            "User-Agent": "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8",
+          },
+          signal: AbortSignal.timeout(6000),
+        });
+
+        const socialHtml = await socialRes.text();
+        const socialTitleMatch = socialHtml.match(/<meta[^>]+(?:property=["']og:title["'][^>]+content=["']([^"']+)["']|content=["']([^"']+)["'][^>]+property=["']og:title["'])/i);
+        const socialImageMatch = socialHtml.match(/<meta[^>]+(?:property=["']og:image["'][^>]+content=["']([^"']+)["']|content=["']([^"']+)["'][^>]+property=["']og:image["'])/i);
+
+        const realTitle = socialTitleMatch ? (socialTitleMatch[1] || socialTitleMatch[2]) : "";
+        const realImage = socialImageMatch ? (socialImageMatch[1] || socialImageMatch[2]) : "";
+
+        // Check that it is NOT the generic homepage title or generic logo
+        const isGenericTitle = !realTitle || realTitle.includes("Situs Belanja Online Terlengkap");
+        const isGenericImage = !realImage || realImage.includes("ios_icon") || realImage.includes("splash_screen");
+
+        if (!isGenericTitle && !isGenericImage) {
+          const cleanName = cleanTitleFromOG(realTitle);
+          console.log(`[SHOPEE SCRAPER SUCCESS] Social OG Scraped: ${cleanName} | Image: ${realImage}`);
+          return {
+            name: cleanName,
+            price: "Cek Promo",
+            imageUrl: realImage,
+            platform: "SHOPEE",
+          };
         }
-        // price from API is in smallest currency unit (e.g. 1489740000 -> 148974)
-        let rawPrice = item.price?.toString();
-        if (rawPrice && rawPrice.length > 5) {
-          rawPrice = rawPrice.slice(0, -5);
-        }
-        return {
-          name: item.name || item.item_name || ogTitle.replace(/^Jual\s+/i, "").trim(),
-          price: formatPrice(rawPrice || item.price_min || item.price),
-          imageUrl: imageUrl || ogImage,
-          platform: "SHOPEE",
-        };
+      } catch (e: any) {
+        console.warn("[SHOPEE SCRAPER] Social crawler fetch failed:", e.message);
       }
     }
 
-    // Fallback to og tags only
-    if (ogImage) {
+    // Step 4: Fallback to OG tags ONLY if API fails and NOT generic Shopee homepage
+    if (ogImage && ogTitle && !ogTitle.includes("Situs Belanja Online Terlengkap") && !ogImage.includes("ios_icon")) {
+      const elapsedFallback = Date.now() - startTime;
+      console.log(`[SHOPEE SCRAPER] Using OG tag fallback after ${elapsedFallback}ms`);
       return {
-        name: ogTitle.replace(/^Jual\s+/i, "").trim(),
+        name: cleanTitleFromOG(ogTitle),
+        price: "Cek Promo",
         imageUrl: ogImage,
         platform: "SHOPEE",
       };
     }
 
-    return { platform: "SHOPEE" };
-  } catch (err) {
-    console.warn("[SCRAPE] Failed to fetch Shopee page:", err);
+    // Step 5: Ultimate fallback
+    const totalElapsed = Date.now() - startTime;
+    console.log(`[SHOPEE SCRAPER] Total time: ${totalElapsed}ms. Returning empty result.`);
+    return { platform: "SHOPEE", name: "", price: "", imageUrl: "" };
+  } catch (err: any) {
+    const totalElapsed = Date.now() - startTime;
+    console.warn(`[SHOPEE SCRAPER ERROR] After ${totalElapsed}ms:`, err.message);
     return { platform: "SHOPEE" };
   }
+}
+
+function cleanTitleFromOG(title: string): string {
+  return title
+    .replace(/^Jual\s+/i, "")
+    .replace(/\|\s*Shopee\s*Indonesia.*$/i, "")
+    .trim();
 }
 
 /**

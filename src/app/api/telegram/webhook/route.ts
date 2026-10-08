@@ -93,9 +93,10 @@ export async function POST(request: Request) {
 
     // Dukung pesan teks maupun caption (jika share foto dari Shopee)
     const text = (msg.text || msg.caption || "").trim();
-    if (!text) return NextResponse.json({ ok: true });
+    const photos = msg.photo;
 
-    const chatId = String(msg.chat.id);
+    // Dukung pesan teks maupun caption (jika share foto dari Shopee)
+    if (!text && (!photos || photos.length === 0)) return NextResponse.json({ ok: true });
 
     // Find user by userId in query OR by telegramChatId
     let settings = null;
@@ -120,6 +121,23 @@ export async function POST(request: Request) {
 
     const token = settings.telegramBotToken;
     const targetUserId = settings.userId;
+
+    let uploadedTelegramImageUrl: string | null = null;
+    // Jika user mengirimkan pesan beserta FOTO (contoh: share dari aplikasi Shopee langsung ke Telegram)
+    if (photos && photos.length > 0) {
+      try {
+        const highestResPhoto = photos[photos.length - 1];
+        const fileId = highestResPhoto.file_id;
+        const fileRes = await fetch(`https://api.telegram.org/bot${token}/getFile?file_id=${fileId}`);
+        const fileData = await fileRes.json();
+        if (fileData.ok && fileData.result?.file_path) {
+          uploadedTelegramImageUrl = `https://api.telegram.org/file/bot${token}/${fileData.result.file_path}`;
+          console.log(`[WEBHOOK] Extracted Telegram Photo URL: ${uploadedTelegramImageUrl}`);
+        }
+      } catch (e: any) {
+        console.warn("[WEBHOOK] Failed to download telegram photo:", e.message);
+      }
+    }
 
     // Save Chat ID if empty
     if (!settings.telegramChatId) {
@@ -227,8 +245,8 @@ export async function POST(request: Request) {
 
         await sendTelegramMessage(token, chatId, `📦 *Produk Terdeteksi!*\nNama: ${parsed.name}\nHarga: Rp ${parsed.price}\n\n⚙️ Memasukkan ke Pipeline Engine...`);
 
-        // Ambil gambar produk langsung dari Shopee / TikTok Shop
-        let finalImageUrl: string | null = parsed.imageUrl || null;
+        // Ambil gambar produk: Prioritaskan foto asli dari Telegram jika ada, lalu scraper
+        let finalImageUrl: string | null = uploadedTelegramImageUrl || parsed.imageUrl || null;
         if (!finalImageUrl && parsed.affiliateUrl) {
           try {
             const scraped = await scrapeMarketplaceProduct(parsed.affiliateUrl);
@@ -278,7 +296,7 @@ export async function POST(request: Request) {
           `⚠️ *AI sibuk sekarang (429).* Saya tetap menyimpan produk ini lewat ekstraksi manual dan akan diproses otomatis.\nNama: ${fallback.name}\nHarga: Rp ${fallback.price}`
         );
 
-        let finalImageUrl: string | null = fallback.imageUrl || null;
+        let finalImageUrl: string | null = uploadedTelegramImageUrl || fallback.imageUrl || null;
         if (!finalImageUrl) {
           try {
             const scraped = await scrapeMarketplaceProduct(fallback.affiliateUrl);
