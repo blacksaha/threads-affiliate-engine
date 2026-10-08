@@ -133,6 +133,27 @@ export async function GET(request: Request) {
         },
       });
 
+      // NOTIFIKASI INSTAN TELEGRAM SAAT BERHASIL TAYANG
+      try {
+        const ownerSettings = await prisma.automationSettings.findUnique({
+          where: { userId: job.userId },
+        });
+        if (ownerSettings?.telegramBotToken && ownerSettings?.telegramChatId && ownerSettings?.telegramEnabled) {
+          const { sendTelegramMessage } = await import('@/lib/telegram');
+          const platforms = [];
+          if (publishResult.threads?.success) platforms.push('🧵 Threads');
+          if (publishResult.facebook?.success) platforms.push('📘 Facebook');
+          if (publishResult.x?.success) platforms.push('✖️ X/Twitter');
+
+          const prodName = job.content?.product?.name || 'Produk';
+          const hookPreview = job.content?.hook ? `\n\n💬 Preview:\n_${job.content.hook}_` : '';
+          const msg = `🚀 *KONTEN BERHASIL TAYANG!*\n\n📦 *${prodName}*\n🌐 Platform: ${platforms.join(', ')}${hookPreview}\n\n_Auto-published 24/7 by Engine._`;
+          await sendTelegramMessage(ownerSettings.telegramBotToken, ownerSettings.telegramChatId, msg);
+        }
+      } catch (notifErr) {
+        console.error('[SCHEDULER] Error sending Telegram publish notification:', notifErr);
+      }
+
       results.push({ jobId: job.id, status: 'PUBLISHED', results: publishResult });
     } else {
       const maxRetries = 3;

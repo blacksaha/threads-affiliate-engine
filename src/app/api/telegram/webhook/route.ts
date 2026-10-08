@@ -140,11 +140,50 @@ export async function POST(request: Request) {
     }
 
     if (text === '/start') {
-      await sendTelegramMessage(token, chatId, "👋 *Halo Master!*\n\nBot siap menerima link Shopee. Bagikan (share) produk dari Shopee ke sini dan sistem akan otomatis memprosesnya.");
+      const reply = "👋 *Halo Master!*\n\nBot Affiliate Content Engine siap bertugas.\n\nKirimkan share link dari Shopee app ke sini (lengkap dengan teksnya atau link saja), dan saya akan mengurus sisanya!\n\nPerintah tersedia:\n`/status` - Cek status engine\n`/queue` - Cek antrean postingan terdekat\n`/pause` - Hentikan automasi publish\n`/resume` - Aktifkan automasi publish";
+      await sendTelegramMessage(token, chatId, reply);
       return NextResponse.json({ ok: true });
     }
 
-    if (text.includes("shopee.co.id") || text.includes("shp.ee")) {
+    if (text === '/status') {
+      const queueCount = await prisma.contentPost.count({ where: { userId: targetUserId, status: 'SCHEDULED' } });
+      const reply = `📊 *STATUS ENGINE*\n\nAutomasi: ${settings.enabled ? '🟢 ACTIVE' : '🔴 PAUSED'}\nAntrean Scheduled: *${queueCount}* post\n\n_Kirimkan link produk untuk menambah antrean._`;
+      await sendTelegramMessage(token, chatId, reply);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (text === '/queue') {
+      const posts = await prisma.contentPost.findMany({
+        where: { userId: targetUserId, status: 'SCHEDULED' },
+        orderBy: { scheduledAt: 'asc' },
+        take: 3,
+        include: { product: true }
+      });
+      if (posts.length === 0) {
+        await sendTelegramMessage(token, chatId, "Antrean kosong. Belum ada konten yang dijadwalkan.");
+      } else {
+        const lines = posts.map(p => {
+          const t = p.scheduledAt ? p.scheduledAt.toLocaleString('id-ID', { timeZone: settings?.timezone || 'Asia/Jakarta' }) : '?';
+          return `⏰ ${t}\n📦 ${p.product?.name || 'Produk'}`;
+        });
+        await sendTelegramMessage(token, chatId, `🗓️ *Top 3 Antrean Terdekat:*\n\n${lines.join('\n\n')}`);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    if (text === '/pause') {
+      await prisma.automationSettings.update({ where: { userId: targetUserId }, data: { enabled: false } });
+      await sendTelegramMessage(token, chatId, "⏸️ Automasi dihentikan. Postingan terjadwal tidak akan dikirim sampai diaktifkan kembali.");
+      return NextResponse.json({ ok: true });
+    }
+
+    if (text === '/resume') {
+      await prisma.automationSettings.update({ where: { userId: targetUserId }, data: { enabled: true } });
+      await sendTelegramMessage(token, chatId, "▶️ Automasi diaktifkan kembali! Sistem siap mem-publish sesuai jadwal.");
+      return NextResponse.json({ ok: true });
+    }
+
+    if (text.includes("shopee.co.id") || text.includes("shp.ee") || text.includes("tokopedia.com") || text.includes("tiktok.com")) {
       // DEDUPLIKASI: Cek apakah link ini sudah pernah dikirim dalam 15 menit terakhir
       // Menggunakan regex untuk mencari link shopee di dalam teks
       const urlMatch = text.match(/https?:\/\/(?:s\.shopee\.co\.id|shp\.ee)\/[^\s]+/i);
