@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useUI } from "@/components/ui/ModalProvider";
 
 type Account = {
   id: string;
@@ -12,6 +13,7 @@ type Account = {
 };
 
 export default function SocialAccountsManager() {
+  const { toast, confirm } = useUI();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [platform, setPlatform] = useState("THREADS");
   const [name, setName] = useState("");
@@ -75,24 +77,38 @@ export default function SocialAccountsManager() {
         setAccountId("");
         setAccessToken("");
         setRefreshToken("");
+        toast.success("Akun sosial media berhasil ditambahkan!", "Tersimpan");
         fetchAccounts();
       } else {
-        alert(json.error || "Gagal menambah akun");
+        toast.error(json.error || "Gagal menambah akun", "Gagal Menambahkan");
       }
     } catch (err: any) {
-      alert("Error: " + err.message);
+      toast.error("Error: " + err.message, "Sistem Error");
     }
     setLoading(false);
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Hapus akun ini dari sistem?")) return;
+    const isConfirmed = await confirm({
+      title: "Hapus Akun Sosial Media",
+      message: "Yakin hapus akun ini dari sistem? Semua postingan terkait akan dibatalkan.",
+      confirmText: "Ya, Hapus!",
+      isDestructive: true,
+    });
+    
+    if (!isConfirmed) return;
+
     try {
       const res = await fetch(`/api/accounts?id=${id}`, { method: "DELETE" });
       const json = await res.json();
-      if (json.success) fetchAccounts();
+      if (json.success) {
+        toast.success("Akun berhasil dihapus.", "Terhapus");
+        fetchAccounts();
+      } else {
+        toast.error("Gagal menghapus akun.", "Gagal");
+      }
     } catch (err: any) {
-      alert("Error: " + err.message);
+      toast.error("Error: " + err.message, "Error");
     }
   };
 

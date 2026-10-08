@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import AuthProvider from "@/components/AuthProvider";
 import SidebarNav from "@/components/SidebarNav";
 import { PWAProvider } from "@/components/PWAProvider";
+import { ModalProvider } from "@/components/ui/ModalProvider";
 import { auth } from "@/lib/auth";
 
 const geistSans = Geist({
@@ -70,20 +71,22 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col md:flex-row bg-bg text-black font-sans overflow-x-hidden">
         <AuthProvider>
           <PWAProvider />
-          {/* Responsive Sidebar & Mobile Nav */}
-          <div className="shrink-0 flex flex-col">
-            <SidebarNav />
-            <div className="hidden md:block">
-              <AutomationStatusBadge initialEnabled={isEnabled} />
+          <ModalProvider>
+            {/* Responsive Sidebar & Mobile Nav */}
+            <div className="shrink-0 flex flex-col">
+              <SidebarNav />
+              <div className="hidden md:block">
+                <AutomationStatusBadge initialEnabled={isEnabled} />
+              </div>
             </div>
-          </div>
 
-          {/* Main Content Area */}
-          <main className="flex-1 min-w-0 min-h-screen overflow-y-auto p-4 sm:p-6 lg:p-8">
-            <div className="max-w-7xl mx-auto">
-              {children}
-            </div>
-          </main>
+            {/* Main Content Area */}
+            <main className="flex-1 min-w-0 min-h-screen overflow-y-auto p-4 sm:p-6 lg:p-8">
+              <div className="max-w-7xl mx-auto">
+                {children}
+              </div>
+            </main>
+          </ModalProvider>
         </AuthProvider>
       </body>
     </html>

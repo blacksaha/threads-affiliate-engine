@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useUI } from "@/components/ui/ModalProvider";
 
 interface User {
   id: string;
@@ -20,6 +21,7 @@ interface User {
 }
 
 export default function AdminPage() {
+  const { toast, prompt } = useUI();
   const [users, setUsers] = useState<User[]>([]);
   const [summary, setSummary] = useState<any>(null);
   const [name, setName] = useState("");
@@ -61,7 +63,12 @@ export default function AdminPage() {
   };
 
   const handleResetPassword = async (id: string) => {
-    const newPassword = prompt("Masukkan password baru untuk user ini:");
+    const newPassword = await prompt({
+      title: "Reset Password",
+      message: "Masukkan password baru untuk user ini:",
+      placeholder: "Password baru...",
+      confirmText: "Simpan Password",
+    });
     if (!newPassword) return;
     try {
       await fetch(`/api/admin/users/${id}`, {
@@ -69,8 +76,9 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ newPassword }),
       });
-      alert("Password berhasil direset!");
-    } catch (e) {
+      toast.success("Password user berhasil direset!", "Reset Berhasil");
+    } catch (e: any) {
+      toast.error("Gagal mereset password: " + e.message, "Gagal");
       console.error(e);
     }
   };

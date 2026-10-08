@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { Trash2, Sparkles, Loader2 } from "lucide-react";
+import { useUI } from "@/components/ui/ModalProvider";
 
 export default function ProductCardActions({ productId }: { productId: string }) {
+  const { toast, confirm } = useUI();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -18,13 +20,13 @@ export default function ProductCardActions({ productId }: { productId: string })
       const data = await res.json();
       
       if (data.success) {
-        alert("✅ Berhasil generate dan menjadwalkan utas baru!");
-        window.location.reload();
+        toast.success("Berhasil generate dan menjadwalkan utas baru!", "Generate Sukses");
+        setTimeout(() => window.location.reload(), 1000);
       } else {
-        alert("❌ Gagal generate utas: " + (data.reason || data.error || "Terjadi kesalahan."));
+        toast.error("Gagal generate utas: " + (data.reason || data.error || "Terjadi kesalahan."), "Gagal Generate");
       }
     } catch (err: any) {
-      alert("❌ Terjadi kesalahan sistem: " + err.message);
+      toast.error("Terjadi kesalahan sistem: " + err.message, "Sistem Error");
     } finally {
       setIsGenerating(false);
     }
@@ -33,9 +35,14 @@ export default function ProductCardActions({ productId }: { productId: string })
   const handleDelete = async () => {
     if (isGenerating || isDeleting) return;
     
-    if (!confirm("Hapus produk ini beserta semua angle dan post yang terhubung? Tindakan ini tidak bisa dibatalkan.")) {
-      return;
-    }
+    const isConfirmed = await confirm({
+      title: "Hapus Produk",
+      message: "Hapus produk ini beserta semua post yang terhubung? Tindakan ini tidak bisa dibatalkan.",
+      confirmText: "Ya, Hapus!",
+      isDestructive: true,
+    });
+
+    if (!isConfirmed) return;
 
     setIsDeleting(true);
     try {
@@ -45,13 +52,14 @@ export default function ProductCardActions({ productId }: { productId: string })
       const data = await res.json();
       
       if (data.success) {
-        window.location.reload();
+        toast.success("Produk berhasil dihapus.", "Terhapus");
+        setTimeout(() => window.location.reload(), 500);
       } else {
-        alert("❌ Gagal menghapus: " + (data.error || "Terjadi kesalahan."));
+        toast.error("Gagal menghapus: " + (data.error || "Terjadi kesalahan."), "Gagal");
         setIsDeleting(false);
       }
     } catch (err: any) {
-      alert("❌ Terjadi kesalahan sistem: " + err.message);
+      toast.error("Terjadi kesalahan sistem: " + err.message, "Gagal");
       setIsDeleting(false);
     }
   };

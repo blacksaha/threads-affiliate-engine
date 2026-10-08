@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles, ArrowRight, Loader2 } from "lucide-react";
+import { useUI } from "@/components/ui/ModalProvider";
 
 export default function ProductIngestForm() {
   const router = useRouter();
+  const { toast } = useUI();
   const [url, setUrl] = useState("");
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
@@ -19,7 +21,7 @@ export default function ProductIngestForm() {
     const extractedUrl = urlMatch ? urlMatch[0] : url.trim();
 
     if (!extractedUrl.includes("shopee.co.id") && !extractedUrl.includes("shp.ee") && !extractedUrl.includes("tiktok.com") && !extractedUrl.includes("tokopedia.com")) {
-      alert("Masukkan link marketplace yang valid (Shopee/TikTok/Tokopedia)!");
+      toast.error("Masukkan link marketplace yang valid (Shopee / TikTok Shop / Tokopedia)!", "Link Tidak Dikenal");
       return;
     }
     
@@ -44,11 +46,12 @@ export default function ProductIngestForm() {
         setName(json.data.name || "");
         if (!extractedPrice || extractedPrice === "Cek Promo") setPrice(json.data.price || "Cek Promo");
         setImageUrl(json.data.imageUrl || "");
+        toast.success("Informasi produk berhasil ditarik!", "Scrape Berhasil");
       } else {
-        alert(json.error || "Gagal scrape produk");
+        toast.error(json.error || "Gagal menarik metadata produk", "Gagal Scrape");
       }
-    } catch (e) {
-      alert("Error: " + String(e));
+    } catch (e: any) {
+      toast.error(e.message || String(e), "Koneksi Error");
     }
     setLoading(false);
   };
@@ -74,13 +77,13 @@ export default function ProductIngestForm() {
         setName("");
         setPrice("");
         setImageUrl("");
-        alert("✅ Produk berhasil dimasukkan ke Pipeline Engine!");
+        toast.success("Produk berhasil dimasukkan ke Pipeline Engine!", "Pipeline Aktif");
         router.refresh();
       } else {
-        alert("❌ Gagal menyimpan produk.");
+        toast.error("Gagal menyimpan produk ke database.", "Gagal Simpan");
       }
-    } catch (error) {
-      alert("Error submit: " + String(error));
+    } catch (error: any) {
+      toast.error("Gagal menyimpan: " + (error.message || String(error)), "Error");
     }
     setSubmitting(false);
   };

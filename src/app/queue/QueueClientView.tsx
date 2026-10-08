@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Zap, Trash2, RotateCw, Eye, EyeOff, XCircle } from "lucide-react";
+import { useUI } from "@/components/ui/ModalProvider";
 
 type Post = {
   id: string;
@@ -36,9 +37,22 @@ export default function QueueClientView({ initialPosts }: { initialPosts: Post[]
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const router = useRouter();
+  const { toast, confirm } = useUI();
 
   async function handleAction(postId: string, action: string) {
-    if (action === "delete" && !confirm("Hapus draft konten ini?")) return;
+    if (action === "delete") {
+      const isConfirmed = await confirm({
+        title: "Hapus Konten",
+        message: "Hapus draft konten ini dari antrean? Tindakan ini tidak bisa dibatalkan.",
+        confirmText: "Ya, Hapus!",
+        isDestructive: true,
+      });
+      if (!isConfirmed) return;
+    } else if (action === "regenerate") {
+      toast.info("Bot sedang menulis ulang naskah baru untuk produk ini...", "Menulis Ulang");
+    } else if (action === "publish_now") {
+      toast.info("Sedang menerbitkan postingan ke Threads & media sosial...", "Menerbitkan");
+    }
     
     try {
       if (action === "cancel") {
@@ -46,20 +60,22 @@ export default function QueueClientView({ initialPosts }: { initialPosts: Post[]
           method: "PATCH",
           body: JSON.stringify({ status: "CANCELLED" }),
         });
+        toast.info("Jadwal publikasi berhasil dibatalkan.", "Dibatalkan");
       } else if (action === "delete") {
         await fetch(`/api/posts/${postId}`, { method: "DELETE" });
+        toast.success("Draft konten berhasil dihapus.", "Terhapus");
       } else if (action === "regenerate") {
-        alert("Bot sedang menulis ulang naskah baru untuk produk ini di background!");
         await fetch(`/api/posts/${postId}`, { method: "POST" });
+        toast.success("Naskah sedang digenerate ulang di antrean background!", "Selesai");
       } else if (action === "publish_now") {
         setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, status: "PUBLISHING" } : p));
         const res = await fetch(`/api/posts/${postId}/publish`, { method: "POST" });
         const json = await res.json();
         if (json.success) {
-          alert("✅ Utas berhasil diterbitkan ke Threads & Platform lain!");
+          toast.success("Utas berhasil diterbitkan ke Threads & Platform lain!", "Berhasil Tayang!");
           setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, status: "PUBLISHED" } : p));
         } else {
-          alert(`❌ Gagal mempublish: ${json.error}`);
+          toast.error(`Gagal mempublish: ${json.error}`, "Gagal Tayang");
           setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, status: "FAILED", lastError: json.error } : p));
         }
       }
@@ -70,9 +86,9 @@ export default function QueueClientView({ initialPosts }: { initialPosts: Post[]
       } else if (action === "delete") {
         setPosts((prev) => prev.filter((p) => p.id !== postId));
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Aksi gagal.");
+      toast.error("Aksi gagal karena kesalahan teknis.", "Gagal");
     }
   }
 
