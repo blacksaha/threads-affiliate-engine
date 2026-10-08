@@ -51,9 +51,11 @@ export interface CallGeminiOptions {
   apiKey?: string | null;
   baseUrl?: string | null;
   modelName?: string | null;
+  fallbackModels?: string[]; // comma-separated list of fallback models
   deepseekApiKey?: string | null;
   deepseekBaseUrl?: string | null;
   deepseekModelName?: string | null;
+  deepseekFallbackModels?: string[];
 }
 
 const HOOK_ARCHETYPES = [
@@ -105,40 +107,74 @@ function extractJson(text: string): string {
   return cleaned;
 }
 
-async function executeDeepSeek(prompt: string, apiKey: string, baseUrl?: string | null, modelName?: string | null, timeoutMs = 40000): Promise<string> {
+async function executeDeepSeek(
+  prompt: string,
+  apiKey: string,
+  baseUrl?: string | null,
+  modelName?: string | null,
+  fallbackModels?: string[],
+  timeoutMs = 40000
+): Promise<string> {
   let base = (baseUrl || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").trim().replace(/\/+$/, "");
   const endpoint = base.endsWith("/chat/completions") ? base : `${base}/chat/completions`;
-  const selectedModel = (modelName || process.env.DEEPSEEK_MODEL || "deepseek-chat").trim();
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: selectedModel,
-        messages: [
-          { role: "system", content: "You are a professional Indonesian content creator and copywriter." },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.7,
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    if (!res.ok) throw new Error(`DeepSeek Error ${res.status}: ${await res.text()}`);
-    const data = await res.json();
-    const content = data.choices?.[0]?.message?.content || "";
-    if (content.trim()) return content.trim();
-    throw new Error("Empty response from DeepSeek API");
-  } catch (err: any) {
-    clearTimeout(timeoutId);
-    throw new Error(`DeepSeek API failed: ${err.message}`);
+  
+  // Build list of models to try in order
+  const primary = (modelName || process.env.DEEPSEEK_MODEL || "deepseek-chat").trim();
+  const modelsToTry = [primary];
+  if (fallbackModels && Array.isArray(fallbackModels)) {
+    for (const fb of fallbackModels) {
+      const cleanFb = fb.trim();
+      if (cleanFb && !modelsToTry.includes(cleanFb)) {
+        modelsToTry.push(cleanFb);
+      }
+    }
   }
+
+  let lastError: any = null;
+
+  for (const modelToTest of modelsToTry) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      console.log(`[GATEWAY] Calling ${endpoint} with model: ${modelToTest}...`);
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: modelToTest,
+          messages: [
+            { role: "system", content: "You are a professional Indonesian content creator and copywriter." },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.7,
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) {
+        const errText = await res.text();
+        console.warn(`[GATEWAY MODEL ERROR] Model ${modelToTest} failed (${res.status}): ${errText}`);
+        lastError = new Error(`Model ${modelToTest} failed (${res.status}): ${errText}`);
+        continue; // Try next fallback model!
+      }
+      const data = await res.json();
+      const content = data.choices?.[0]?.message?.content || "";
+      if (content.trim()) {
+        console.log(`[GATEWAY SUCCESS] Content generated successfully with model: ${modelToTest}`);
+        return content.trim();
+      }
+      lastError = new Error(`Empty response from model ${modelToTest}`);
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      console.warn(`[GATEWAY MODEL EXCEPTION] Model ${modelToTest} exception: ${err.message}`);
+      lastError = err;
+    }
+  }
+
+  throw new Error(`All gateway models failed. Last error: ${lastError?.message || String(lastError)}`);
 }
 
 export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): Promise<string> {
@@ -146,8 +182,15 @@ export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): 
   const dsKey = opts.deepseekApiKey || (isDeepSeek ? opts.apiKey : null) || process.env.DEEPSEEK_API_KEY;
 
   if (isDeepSeek) {
-    if (!dsKey) throw new Error("DeepSeek API Key is not configured.");
-    return executeDeepSeek(prompt, dsKey, opts.baseUrl || opts.deepseekBaseUrl, opts.modelName || opts.deepseekModelName, opts.timeoutMs);
+    if (!dsKey) throw new Error("DeepSeek/Gateway API Key is not configured.");
+    return executeDeepSeek(
+      prompt,
+      dsKey,
+      opts.baseUrl || opts.deepseekBaseUrl,
+      opts.modelName || opts.deepseekModelName,
+      opts.fallbackModels || opts.deepseekFallbackModels,
+      opts.timeoutMs
+    );
   }
 
   // If user provided custom Google Gemini API Key
@@ -249,6 +292,7 @@ export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): 
         dsKey,
         opts.deepseekBaseUrl || opts.baseUrl,
         opts.deepseekModelName || opts.modelName,
+        opts.deepseekFallbackModels || opts.fallbackModels,
         opts.timeoutMs
       );
       if (fallbackResult) {

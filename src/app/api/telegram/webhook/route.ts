@@ -207,11 +207,16 @@ export async function POST(request: Request) {
         const settings = await prisma.automationSettings.findUnique({
           where: { userId: targetUserId }
         });
+        const fallbackModels = settings?.aiFallbackModels
+          ? settings.aiFallbackModels.split(',').map((s) => s.trim()).filter(Boolean)
+          : [];
+
         const aiConfig = {
           provider: settings?.aiProvider || "GEMINI",
           apiKey: settings?.aiApiKey || null,
           baseUrl: settings?.aiBaseUrl || null,
           modelName: settings?.aiModel || null,
+          fallbackModels,
         };
 
         const prompt = EXTRACTOR_PROMPT.replace("{MESSAGE}", text);

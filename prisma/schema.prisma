@@ -108,7 +108,8 @@ model AutomationSettings {
 
   // AI Configuration (Multi-tenant)
   aiProvider              String   @default("GEMINI") // "GEMINI" or "DEEPSEEK"
-  aiModel                 String?  // custom model name (e.g. "deepseek-v4.1-flash", "gpt-4o")
+  aiModel                 String?  // custom primary model name (e.g. "deepseek-v4.1-flash")
+  aiFallbackModels        String?  // comma-separated fallback models (e.g. "deepseek-v4-pro-0813,glm-5.1")
   aiApiKey                String?  // user's custom API key (or null to fallback to system/owner key)
   aiBaseUrl               String?  // custom Base URL (proxy) for OpenAI-compatible/DeepSeek endpoints
 
