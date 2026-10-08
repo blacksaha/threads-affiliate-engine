@@ -50,6 +50,8 @@ export interface CallGeminiOptions {
   provider?: string;
   apiKey?: string | null;
   baseUrl?: string | null;
+  deepseekApiKey?: string | null;
+  deepseekBaseUrl?: string | null;
 }
 
 const HOOK_ARCHETYPES = [
@@ -101,45 +103,48 @@ function extractJson(text: string): string {
   return cleaned;
 }
 
+async function executeDeepSeek(prompt: string, apiKey: string, baseUrl?: string | null, timeoutMs = 40000): Promise<string> {
+  let base = (baseUrl || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").trim().replace(/\/+$/, "");
+  const endpoint = base.endsWith("/chat/completions") ? base : `${base}/chat/completions`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        messages: [
+          { role: "system", content: "You are a professional Indonesian content creator and copywriter." },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.7,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) throw new Error(`DeepSeek Error ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content || "";
+    if (content.trim()) return content.trim();
+    throw new Error("Empty response from DeepSeek API");
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    throw new Error(`DeepSeek API failed: ${err.message}`);
+  }
+}
+
 export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): Promise<string> {
   const isDeepSeek = opts.provider === "DEEPSEEK";
+  const dsKey = opts.deepseekApiKey || (isDeepSeek ? opts.apiKey : null) || process.env.DEEPSEEK_API_KEY;
 
   if (isDeepSeek) {
-    const dsKey = opts.apiKey || process.env.DEEPSEEK_API_KEY;
     if (!dsKey) throw new Error("DeepSeek API Key is not configured.");
-
-    let base = (opts.baseUrl || process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").trim().replace(/\/+$/, "");
-    const endpoint = base.endsWith("/chat/completions") ? base : `${base}/chat/completions`;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), opts.timeoutMs || 40000);
-    try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${dsKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "deepseek-chat",
-          messages: [
-            { role: "system", content: "You are a professional Indonesian content creator and copywriter." },
-            { role: "user", content: prompt },
-          ],
-          temperature: 0.7,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      if (!res.ok) throw new Error(`DeepSeek Error ${res.status}: ${await res.text()}`);
-      const data = await res.json();
-      const content = data.choices?.[0]?.message?.content || "";
-      if (content.trim()) return content.trim();
-      throw new Error("Empty response from DeepSeek API");
-    } catch (err: any) {
-      clearTimeout(timeoutId);
-      throw new Error(`DeepSeek API failed: ${err.message}`);
-    }
+    return executeDeepSeek(prompt, dsKey, opts.baseUrl || opts.deepseekBaseUrl, opts.timeoutMs);
   }
 
   // If user provided custom Google Gemini API Key
@@ -229,6 +234,20 @@ export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): 
           clearTimeout(timeoutId);
         }
       }
+    }
+  }
+
+  // AUTO-FAILOVER KE DEEPSEEK JIKA GEMINI KENA 429/LIMIT/OVERLOAD
+  if (dsKey) {
+    console.warn(`[FAILOVER] Gemini rate-limited or unavailable. Auto-switching to DeepSeek fallback...`);
+    try {
+      const fallbackResult = await executeDeepSeek(prompt, dsKey, opts.deepseekBaseUrl || opts.baseUrl, opts.timeoutMs);
+      if (fallbackResult) {
+        console.log(`[FAILOVER SUCCESS] Content generated successfully using DeepSeek!`);
+        return fallbackResult;
+      }
+    } catch (dsErr: any) {
+      console.error(`[FAILOVER ERROR] DeepSeek fallback also failed: ${dsErr.message}`);
     }
   }
 
