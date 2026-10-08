@@ -20,6 +20,7 @@ type Settings = {
   aiProvider: string;
   aiApiKey: string | null;
   aiBaseUrl: string | null;
+  aiModel: string | null;
   threadsUserId: string | null;
   threadsAccessToken: string | null;
   threadsConnected: boolean;

@@ -244,7 +244,13 @@ export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): 
   if (dsKey) {
     console.warn(`[FAILOVER] Gemini rate-limited or unavailable. Auto-switching to DeepSeek fallback...`);
     try {
-      const fallbackResult = await executeDeepSeek(prompt, dsKey, opts.deepseekBaseUrl || opts.baseUrl, opts.timeoutMs);
+      const fallbackResult = await executeDeepSeek(
+        prompt,
+        dsKey,
+        opts.deepseekBaseUrl || opts.baseUrl,
+        opts.deepseekModelName || opts.modelName,
+        opts.timeoutMs
+      );
       if (fallbackResult) {
         console.log(`[FAILOVER SUCCESS] Content generated successfully using DeepSeek!`);
         return fallbackResult;
