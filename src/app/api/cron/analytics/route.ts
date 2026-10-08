@@ -3,7 +3,41 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+const rateLimitMap = new Map<string, { count: number; firstReq: number }>();
+
+function isRateLimited(ip: string, limit = 5, windowMs = 10000): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(ip);
+  if (!record || now - record.firstReq > windowMs) {
+    rateLimitMap.set(ip, { count: 1, firstReq: now });
+    return false;
+  }
+  if (record.count >= limit) {
+    return true;
+  }
+  record.count++;
+  return false;
+}
+
+export async function GET(request: Request) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  if (isRateLimited(ip, 5, 10000)) {
+    return NextResponse.json(
+      { error: 'Too Many Requests', message: 'Rate limit exceeded.' },
+      { status: 429, headers: { 'Retry-After': '10' } }
+    );
+  }
+
+  const { searchParams } = new URL(request.url);
+  const authHeader = request.headers.get('authorization');
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}` && searchParams.get('secret') !== cronSecret) {
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
   const publishedPosts = await prisma.contentPost.findMany({
     where: {
       status: 'PUBLISHED',

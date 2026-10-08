@@ -5,7 +5,34 @@ import { publishThreadChain } from '@/lib/threads';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60; // Allow 60s for batch processing and publishing
 
+// In-memory sliding window rate limiter
+const rateLimitMap = new Map<string, { count: number; firstReq: number }>();
+
+function isRateLimited(ip: string, limit = 5, windowMs = 10000): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(ip);
+  if (!record || now - record.firstReq > windowMs) {
+    rateLimitMap.set(ip, { count: 1, firstReq: now });
+    return false;
+  }
+  if (record.count >= limit) {
+    return true;
+  }
+  record.count++;
+  return false;
+}
+
 export async function GET(request: Request) {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  
+  // Rate limit: Max 5 requests per 10 seconds per IP
+  if (isRateLimited(ip, 5, 10000)) {
+    return NextResponse.json(
+      { error: 'Too Many Requests', message: 'Rate limit exceeded. Please wait a moment.' },
+      { status: 429, headers: { 'Retry-After': '10' } }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
