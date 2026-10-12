@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import { publishThreadChain } from './threads';
+import { getPublicImageUrl } from './public-image';
 
 export interface MultiPlatformResult {
   threads?: { success: boolean; id?: string; error?: string };
@@ -73,9 +74,24 @@ export async function publishToFacebook(
     });
 
     const data = await res.json();
-    const createdPostId = data.post_id || data.id;
+    let createdPostId = data.post_id || data.id;
 
-    if (!createdPostId) {
+    // Graceful fallback: If photo upload failed (e.g. invalid/expired image URL), fallback to plain text feed post!
+    if (!createdPostId && imageUrl && imageUrl.startsWith("http")) {
+      console.warn(`[FACEBOOK] Photo post failed (${JSON.stringify(data)}). Retrying as plain text feed post.`);
+      const fallbackUrl = `https://graph.facebook.com/v19.0/${pageId}/feed`;
+      const fallbackBody = { message, access_token: accessToken };
+      const fallbackRes = await fetch(fallbackUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(fallbackBody),
+      });
+      const fallbackData = await fallbackRes.json();
+      createdPostId = fallbackData.post_id || fallbackData.id;
+      if (!createdPostId) {
+        return { success: false, error: JSON.stringify(fallbackData) };
+      }
+    } else if (!createdPostId) {
       return { success: false, error: JSON.stringify(data) };
     }
 
@@ -239,11 +255,12 @@ export async function publishToAllPlatforms(postId: string): Promise<MultiPlatfo
       } catch {
         chain = [post.hook || "", post.body || "", post.cta || ""].filter(Boolean);
       }
+      const resolvedImageUrl = getPublicImageUrl(post.product?.imageUrl, post.product?.id);
       const tRes = await publishThreadChain(
         settings.threadsUserId,
         settings.threadsAccessToken,
         chain,
-        post.product?.imageUrl
+        resolvedImageUrl
       );
       results.threads = { success: tRes.success, id: tRes.publishedId, error: tRes.error };
     }
@@ -253,6 +270,8 @@ export async function publishToAllPlatforms(postId: string): Promise<MultiPlatfo
   const extraAccounts = await prisma.socialAccount.findMany({
     where: { userId: post.userId, isActive: true }
   });
+
+  const resolvedImageUrl = getPublicImageUrl(post.product?.imageUrl, post.product?.id);
 
   for (const acc of extraAccounts) {
     if (acc.platform === "THREADS") {
@@ -271,7 +290,7 @@ export async function publishToAllPlatforms(postId: string): Promise<MultiPlatfo
       } catch {
         chain = [post.hook || "", post.body || "", post.cta || ""].filter(Boolean);
       }
-      await publishThreadChain(acc.accountId, acc.accessToken, chain, post.product?.imageUrl);
+      await publishThreadChain(acc.accountId, acc.accessToken, chain, resolvedImageUrl);
     } else if (acc.platform === "FACEBOOK") {
       if (post.facebookPostId) {
         console.log(`[PUBLISHER] Facebook already published for post ${postId}. Skipping.`);
@@ -279,7 +298,7 @@ export async function publishToAllPlatforms(postId: string): Promise<MultiPlatfo
       }
       const fbText = post.fbContent || `${post.hook}\n\n${post.body}\n\n${post.cta}`;
       const fbComment = post.fbComment || post.product?.affiliateUrl;
-      const fbRes = await publishToFacebook(acc.accountId, acc.accessToken, fbText, post.product?.imageUrl, fbComment);
+      const fbRes = await publishToFacebook(acc.accountId, acc.accessToken, fbText, resolvedImageUrl, fbComment);
       results.facebook = fbRes;
       // Update post with FB id if success
       if (fbRes.success && fbRes.id) {

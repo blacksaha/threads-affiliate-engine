@@ -18,16 +18,27 @@ function formatPrice(value: number | string | undefined): string {
   return num.toLocaleString("id-ID");
 }
 
-function extractIdsFromRedirectUrl(url: string): { shopId?: string; itemId?: string } | null {
+function extractIdsFromRedirectUrl(url: string, htmlContent?: string): { shopId?: string; itemId?: string } | null {
   try {
-    const u = new URL(url);
-    // Full product URL: https://shopee.co.id/<slug>/<shopid>/<itemid>?...
-    const parts = u.pathname.split("/").filter(Boolean);
-    if (parts.length >= 3) {
-      const shopId = parts[parts.length - 2];
-      const itemId = parts[parts.length - 1];
-      if (/^\d+$/.test(shopId) && /^\d+$/.test(itemId)) {
-        return { shopId, itemId };
+    // 1. Try URL path matching
+    const matchLoc = url.match(/\/(\d+)\/(\d+)/);
+    if (matchLoc) {
+      return { shopId: matchLoc[1], itemId: matchLoc[2] };
+    }
+
+    // 2. Try standard /a-i.shopid.itemid
+    const matchAi = url.match(/a-i\.(\d+)\.(\d+)/);
+    if (matchAi) {
+      return { shopId: matchAi[1], itemId: matchAi[2] };
+    }
+
+    // 3. Try parsing from HTML body (httpUrl or deepLinkUrl inside Shopee redirect page)
+    if (htmlContent) {
+      const matchBody = htmlContent.match(/shopee\.co\.id[\\\/]+[a-zA-Z0-9_-]+[\\\/]+(\d+)[\\\/]+(\d+)/i) ||
+                        htmlContent.match(/navigate_url=https%3A%2F%2Fshopee\.co\.id%2F[^%]+%2F(\d+)%2F(\d+)/i) ||
+                        htmlContent.match(/\/product[\\\/]+(\d+)[\\\/]+(\d+)/i);
+      if (matchBody) {
+        return { shopId: matchBody[1], itemId: matchBody[2] };
       }
     }
   } catch {
@@ -42,13 +53,14 @@ export async function scrapeShopeePage(url: string): Promise<ShopeeScrapeResult>
   try {
     console.log(`[SHOPEE SCRAPER] Resolving short link: ${url}...`);
 
-    // Step 1: Follow manual redirect to reliably grab the Location header
     let targetUrl = url;
+    let initialHtml = "";
+
     try {
       const initRes = await fetch(url, {
         redirect: "manual",
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
         },
         signal: AbortSignal.timeout(6000),
       });
@@ -57,8 +69,8 @@ export async function scrapeShopeePage(url: string): Promise<ShopeeScrapeResult>
       if (loc) {
         targetUrl = loc.startsWith("http") ? loc : new URL(loc, "https://shopee.co.id").toString();
       } else {
-        const text = await initRes.text();
-        const aMatch = text.match(/<a[^>]+href=["']([^"']+)["']/i);
+        initialHtml = await initRes.text();
+        const aMatch = initialHtml.match(/<a[^>]+href=["']([^"']+)["']/i);
         if (aMatch?.[1]) {
           targetUrl = aMatch[1].startsWith("http") ? aMatch[1] : new URL(aMatch[1], "https://shopee.co.id").toString();
         }
@@ -69,14 +81,14 @@ export async function scrapeShopeePage(url: string): Promise<ShopeeScrapeResult>
 
     console.log(`[SHOPEE SCRAPER] Target URL after redirect: ${targetUrl}`);
 
-    // Step 2: Extract shopId & itemId from the resolved URL
-    const ids = extractIdsFromRedirectUrl(targetUrl);
+    // Step 2: Extract shopId & itemId
+    const ids = extractIdsFromRedirectUrl(targetUrl, initialHtml);
 
     // Step 3: Fetch Canonical Product page via Social Crawler UA (facebookexternalhit)
-    // Shopee's SSR server ALWAYS renders the real product title and high-res image for crawlers!
+    // Format a-i.shopId.itemId guarantees SSR rendering of og:image and og:title!
     if (ids?.itemId && ids.shopId) {
       console.log(`[SHOPEE SCRAPER] Extracted ShopID=${ids.shopId}, ItemID=${ids.itemId}`);
-      const canonicalUrl = `https://shopee.co.id/product/${ids.shopId}/${ids.itemId}`;
+      const canonicalUrl = `https://shopee.co.id/a-i.${ids.shopId}.${ids.itemId}`;
 
       try {
         const socialRes = await fetch(canonicalUrl, {

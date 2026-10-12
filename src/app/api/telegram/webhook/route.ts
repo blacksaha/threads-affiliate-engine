@@ -249,14 +249,14 @@ export async function POST(request: Request) {
 
         await sendTelegramMessage(token, chatId, `📦 *Produk Terdeteksi!*\nNama: ${parsed.name}\nHarga: Rp ${parsed.price}\n\n⚙️ Memasukkan ke Pipeline Engine...`);
 
-        // Ambil gambar produk: Prioritaskan foto asli dari Telegram jika ada, lalu scraper
-        let finalImageUrl: string | null = uploadedTelegramImageUrl || parsed.imageUrl || null;
-        if (!finalImageUrl && parsed.affiliateUrl) {
+        // Ambil gambar produk: Prioritaskan CDN resmi marketplace (Shopee/TikTok), fallback ke foto Telegram
+        let finalImageUrl: string | null = null;
+        if (parsed.affiliateUrl) {
           try {
             const scraped = await scrapeMarketplaceProduct(parsed.affiliateUrl);
             if (scraped.imageUrl) {
               finalImageUrl = scraped.imageUrl;
-              console.log(`[WEBHOOK] Image URL found: ${finalImageUrl}`);
+              console.log(`[WEBHOOK] Image URL from Marketplace CDN: ${finalImageUrl}`);
             }
             if (!parsed.name || parsed.name === "Produk Shopee Promo" || parsed.name.includes("Promo")) {
               if (scraped.name) parsed.name = scraped.name;
@@ -267,6 +267,9 @@ export async function POST(request: Request) {
           } catch (e) {
             console.warn('[WEBHOOK] Marketplace scrape failed:', e);
           }
+        }
+        if (!finalImageUrl) {
+          finalImageUrl = uploadedTelegramImageUrl || parsed.imageUrl || null;
         }
 
         const product = await prisma.product.create({
@@ -300,8 +303,8 @@ export async function POST(request: Request) {
           `⚠️ *AI sibuk sekarang (429).* Saya tetap menyimpan produk ini lewat ekstraksi manual dan akan diproses otomatis.\nNama: ${fallback.name}\nHarga: Rp ${fallback.price}`
         );
 
-        let finalImageUrl: string | null = uploadedTelegramImageUrl || fallback.imageUrl || null;
-        if (!finalImageUrl) {
+        let finalImageUrl: string | null = null;
+        if (fallback.affiliateUrl) {
           try {
             const scraped = await scrapeMarketplaceProduct(fallback.affiliateUrl);
             finalImageUrl = scraped.imageUrl || null;
@@ -310,6 +313,9 @@ export async function POST(request: Request) {
           } catch (e) {
             console.warn('[WEBHOOK] Fallback image scrape failed:', e);
           }
+        }
+        if (!finalImageUrl) {
+          finalImageUrl = uploadedTelegramImageUrl || fallback.imageUrl || null;
         }
 
         await prisma.product.create({

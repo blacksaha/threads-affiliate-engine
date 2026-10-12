@@ -50,6 +50,40 @@ export async function publishThreadChain(
 
       const createData = await createRes.json();
       if (!createData.id) {
+        // A rejected image (unreachable URI, wrong format) must not lose the post:
+        // retry the same text as a plain TEXT container without the image.
+        if (isImagePost) {
+          console.warn(`[THREADS] Image container rejected for image ${imageUrl}: ${JSON.stringify(createData)}. Retrying as TEXT.`);
+          const retryBody: Record<string, string> = {
+            media_type: "TEXT",
+            text,
+            access_token: accessToken,
+          };
+          if (replyToId) retryBody.reply_to_id = replyToId;
+
+          const retryRes = await fetch(createUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams(retryBody),
+          });
+          const retryData = await retryRes.json();
+          if (retryData.id) {
+            const retryContainerId = retryData.id;
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            const retryPublishUrl = `https://graph.threads.net/v1.0/${userId}/threads_publish`;
+            const retryPublishRes = await fetch(retryPublishUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({ creation_id: retryContainerId, access_token: accessToken }),
+            });
+            const retryPublishData = await retryPublishRes.json();
+            if (retryPublishData.id) {
+              replyToId = retryPublishData.id;
+              continue;
+            }
+            return { success: false, error: `Publish (text fallback) failed at post ${i + 1}: ${JSON.stringify(retryPublishData)}` };
+          }
+        }
         return { success: false, error: `Container creation failed at post ${i + 1}: ${JSON.stringify(createData)}` };
       }
 
