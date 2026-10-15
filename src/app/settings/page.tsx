@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import SettingsClientForm from "./SettingsClientForm";
+import AIGatewayManager from "@/components/AIGatewayManager";
 import SocialAccountsManager from "@/components/SocialAccountsManager";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -40,14 +41,20 @@ export default async function SettingsPage() {
   });
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-6">
+    <div className="p-8 max-w-4xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-white">Automation Settings</h1>
         <p className="text-sm text-slate-400">
-          Konfigurasi sakelar otomasi, aturan jadwal tayang, dan kredensial API Threads.
+          Konfigurasi sakelar otomasi, manajemen multi-API Key AI Gateways, aturan jadwal tayang, dan akun sosial media.
         </p>
       </div>
 
+      {/* AI Gateways & Multi-Model API Keys Manager */}
+      <AIGatewayManager />
+
+      <hr className="border-slate-800" />
+
+      {/* Automation Rules & Platform Tokens */}
       <SettingsClientForm initialSettings={settings} />
       
       <hr className="border-slate-800" />

@@ -134,16 +134,23 @@ export default function SettingsClientForm({ initialSettings }: { initialSetting
         </div>
       </div>
 
-      {/* AI Configuration */}
+      {/* AI Legacy Fallback Configuration */}
       <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-4">
-        <h2 className="text-lg font-bold text-white">AI Content Engine</h2>
-        <p className="text-xs text-slate-400">
-          Pilih otak AI yang akan membedah produk dan menyusun copywriting utas.
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-white">AI Content Engine — Fallback System</h2>
+            <p className="text-xs text-slate-400">
+              Cadangan otomatis bila <strong className="text-slate-300">seluruh API Key Gateway</strong> di panel atas habis limit atau error.
+            </p>
+          </div>
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 shrink-0">
+            Opsional
+          </span>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">AI Provider</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Fallback AI Provider</label>
             <select
               value={settings.aiProvider || "GEMINI"}
               onChange={(e) => setSettings((s) => ({ ...s, aiProvider: e.target.value }))}
@@ -155,7 +162,7 @@ export default function SettingsClientForm({ initialSettings }: { initialSetting
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Custom API Key</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">Fallback API Key</label>
             <input
               type="password"
               value={settings.aiApiKey || ""}
@@ -169,7 +176,7 @@ export default function SettingsClientForm({ initialSettings }: { initialSetting
             <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Custom Base URL / Proxy Server (Opsional)
+                  Fallback Base URL / Proxy Server (Opsional)
                 </label>
                 <input
                   type="text"
@@ -181,7 +188,7 @@ export default function SettingsClientForm({ initialSettings }: { initialSetting
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Primary Model Name
+                  Fallback Primary Model Name
                 </label>
                 <input
                   type="text"
@@ -193,7 +200,7 @@ export default function SettingsClientForm({ initialSettings }: { initialSetting
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Backup / Fallback Models (Opsional, pisahkan koma)
+                  Fallback Models (Opsional, pisahkan koma)
                 </label>
                 <input
                   type="text"
@@ -203,7 +210,7 @@ export default function SettingsClientForm({ initialSettings }: { initialSetting
                   className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
                 />
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Jika model utama offline / 403 / 429 di gateway, engine akan secara otomatis mencoba model-model cadangan ini secara berurutan. Sangat cocok untuk CleveCode, Vikey.ai, OpenRouter, dsb.
+                  Engine akan mencoba model-model cadangan ini secara berurutan. Sangat cocok untuk CleveCode, Vikey.ai, OpenRouter, dsb.
                 </p>
               </div>
             </div>

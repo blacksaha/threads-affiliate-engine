@@ -106,7 +106,7 @@ model AutomationSettings {
   timezone                String   @default("Asia/Makassar")
   similarityThreshold     Float    @default(0.7)
 
-  // AI Configuration (Multi-tenant)
+  // AI Configuration (Multi-tenant legacy fallback)
   aiProvider              String   @default("GEMINI") // "GEMINI" or "DEEPSEEK"
   aiModel                 String?  // custom primary model name (e.g. "deepseek-v4.1-flash")
   aiFallbackModels        String?  // comma-separated fallback models (e.g. "deepseek-v4-pro-0813,glm-5.1")
@@ -123,6 +123,26 @@ model AutomationSettings {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Multi-gateway AI Key Management
+model AIGatewayKey {
+  id           String   @id @default(uuid())
+  userId       String   @default("default_user")
+  name         String   // e.g. "Gemini Primary", "DeepSeek Backup", "CleveCode Gateway"
+  provider     String   // "GEMINI", "DEEPSEEK", "OPENAI", "CUSTOM"
+  isActive     Boolean  @default(true)
+  priority     Int      @default(0) // lower number = higher priority
+  apiKey       String   // encrypted at rest
+  baseUrl      String?  // for custom/openai-compatible endpoints
+  modelName    String   // e.g. "gemini-2.0-flash", "deepseek-chat", "custom-model-name"
+  modelType    String   // type of model: "chat", "completion", etc.
+  metadata     String?  // JSON object for extra config (rate limits, features, etc.)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId, isActive])
+  @@index([provider])
 }
 
 model SchedulerJob {

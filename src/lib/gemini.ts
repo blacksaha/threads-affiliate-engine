@@ -37,6 +37,17 @@ const ROUND_BACKOFF_MS = [1500, 4000, 8000];
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+export interface AIGatewayConfig {
+  id?: string;
+  name?: string;
+  provider: string; // "GEMINI", "DEEPSEEK", "OPENAI", "CUSTOM"
+  apiKey: string;
+  baseUrl?: string | null;
+  modelName?: string | null;
+  priority?: number;
+  isActive?: boolean;
+}
+
 export interface CallGeminiOptions {
   /** Overrides the default 40s per-request timeout (ms). */
   timeoutMs?: number;
@@ -56,6 +67,7 @@ export interface CallGeminiOptions {
   deepseekBaseUrl?: string | null;
   deepseekModelName?: string | null;
   deepseekFallbackModels?: string[];
+  gateways?: AIGatewayConfig[];
 }
 
 const HOOK_ARCHETYPES = [
@@ -178,6 +190,49 @@ async function executeDeepSeek(
 }
 
 export async function callGemini(prompt: string, opts: CallGeminiOptions = {}): Promise<string> {
+  // If user configured multiple gateways, iterate through them in priority order
+  if (opts.gateways && opts.gateways.length > 0) {
+    const sorted = [...opts.gateways].sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+    let lastGatewayError: any = null;
+
+    for (const gw of sorted) {
+      if (gw.isActive === false) continue;
+      const gwProvider = (gw.provider || 'GEMINI').toUpperCase();
+      console.log(`[AI GATEWAY ENGINE] Attempting Gateway: "${gw.name || gwProvider}" [${gwProvider}] - Model: ${gw.modelName || 'default'}...`);
+
+      try {
+        if (gwProvider === 'GEMINI') {
+          const res = await callGemini(prompt, {
+            ...opts,
+            gateways: undefined, // prevent infinite recursion
+            provider: 'GEMINI',
+            apiKey: gw.apiKey,
+            modelName: gw.modelName,
+          });
+          if (res) return res;
+        } else {
+          // DEEPSEEK, OPENAI, CUSTOM
+          const res = await executeDeepSeek(
+            prompt,
+            gw.apiKey,
+            gw.baseUrl || (gwProvider === 'DEEPSEEK' ? 'https://api.deepseek.com' : gwProvider === 'OPENAI' ? 'https://api.openai.com/v1' : null),
+            gw.modelName || (gwProvider === 'DEEPSEEK' ? 'deepseek-chat' : 'gpt-4o-mini'),
+            opts.fallbackModels,
+            opts.timeoutMs
+          );
+          if (res) return res;
+        }
+      } catch (err: any) {
+        console.warn(`[AI GATEWAY ENGINE] Gateway "${gw.name || gwProvider}" failed: ${err.message}. Trying next available gateway...`);
+        lastGatewayError = err;
+      }
+    }
+
+    if (lastGatewayError) {
+      console.warn(`[AI GATEWAY ENGINE] All configured gateways failed (${lastGatewayError.message}). Falling back to system defaults.`);
+    }
+  }
+
   const isDeepSeek = opts.provider === "DEEPSEEK";
   const dsKey = opts.deepseekApiKey || (isDeepSeek ? opts.apiKey : null) || process.env.DEEPSEEK_API_KEY;
 

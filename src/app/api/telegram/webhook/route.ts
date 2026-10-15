@@ -4,6 +4,7 @@ import { runProductPipeline } from '@/lib/pipeline';
 import { callGemini } from '@/lib/gemini';
 import { sendTelegramMessage } from '@/lib/telegram';
 import { scrapeMarketplaceProduct } from '@/lib/shopee';
+import { buildAIConfig } from '@/lib/ai-config';
 
 const EXTRACTOR_PROMPT = `Anda adalah AI asisten bot yang cerdas dalam mengekstrak data produk affiliate (Shopee, TikTok Shop, Tokopedia) dari pesan pengguna.
 PESAN BISA BERISI:
@@ -226,20 +227,7 @@ export async function POST(request: Request) {
       await sendTelegramMessage(token, chatId, "⏳ Sedang membedah produk dengan AI...");
 
       try {
-        const settings = await prisma.automationSettings.findUnique({
-          where: { userId: targetUserId }
-        });
-        const fallbackModels = settings?.aiFallbackModels
-          ? settings.aiFallbackModels.split(',').map((s) => s.trim()).filter(Boolean)
-          : [];
-
-        const aiConfig = {
-          provider: settings?.aiProvider || "GEMINI",
-          apiKey: settings?.aiApiKey || null,
-          baseUrl: settings?.aiBaseUrl || null,
-          modelName: settings?.aiModel || null,
-          fallbackModels,
-        };
+        const aiConfig = await buildAIConfig(targetUserId);
 
         const prompt = EXTRACTOR_PROMPT.replace("{MESSAGE}", text);
         // Hard 20s ceiling: the webhook must stay well inside maxDuration=60 and

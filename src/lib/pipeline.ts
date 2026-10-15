@@ -1,4 +1,5 @@
 import { prisma } from './prisma';
+import { buildAIConfig } from './ai-config';
 import {
   generateProductAngles,
   generateThreadContent,
@@ -64,17 +65,7 @@ export async function runProductPipeline(productId: string, userId = 'default_us
     create: { userId },
   });
 
-  const fallbackModels = settings.aiFallbackModels
-    ? settings.aiFallbackModels.split(',').map((s) => s.trim()).filter(Boolean)
-    : [];
-
-  const aiConfig = {
-    provider: settings.aiProvider || "GEMINI",
-    apiKey: settings.aiApiKey || null,
-    baseUrl: settings.aiBaseUrl || null,
-    modelName: settings.aiModel || null,
-    fallbackModels,
-  };
+  const aiConfig = await buildAIConfig(userId);
 
   // 1. Assign angle if product has none (Quick archetype selection without LLM latency)
   let angle = product.angles[0];
